@@ -152,7 +152,7 @@ export function TranslateWindow() {
   };
 
   return (
-    <div ref={rootRef} className="group flex h-full flex-col bg-surface">
+    <div ref={rootRef} className="surface group flex h-full flex-col">
       <header data-tauri-drag-region className="flex h-9 shrink-0 items-center pl-2 pr-1.5">
         {direction ? (
           <button

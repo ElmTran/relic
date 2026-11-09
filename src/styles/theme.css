@@ -1,9 +1,14 @@
 @import "tailwindcss";
 
-/* 主题变量：叠加在原生 Acrylic 上的半透明色。圆角和外框由 DWM 原生绘制，CSS 不画。 */
+/* 主题变量：叠加在原生 Acrylic 上的半透明底色 + 柔和的多色渐变。圆角和外框由 DWM 原生绘制，CSS 不画。 */
 :root,
 :root[data-theme="light"] {
-  --surface: rgb(252 252 252 / 0.5);
+  --surface: rgb(248 249 253 / 0.72);
+  /* 左上淡蓝、右下淡粉、左下一点青 */
+  --surface-gradient:
+    radial-gradient(90% 120% at 0% 0%, rgb(178 208 255 / 0.5), transparent 70%),
+    radial-gradient(90% 120% at 100% 100%, rgb(255 200 232 / 0.5), transparent 70%),
+    radial-gradient(60% 90% at 0% 100%, rgb(190 245 250 / 0.4), transparent 70%);
   --fg: rgb(26 26 26);
   --fg-muted: rgb(0 0 0 / 0.45);
   --divider: rgb(0 0 0 / 0.08);
@@ -16,7 +21,12 @@
 }
 
 :root[data-theme="dark"] {
-  --surface: rgb(32 32 32 / 0.45);
+  --surface: rgb(22 24 32 / 0.55);
+  /* 左上深蓝、右下紫、左下一点青 */
+  --surface-gradient:
+    radial-gradient(90% 120% at 0% 0%, rgb(60 96 200 / 0.35), transparent 70%),
+    radial-gradient(90% 120% at 100% 100%, rgb(150 72 172 / 0.3), transparent 70%),
+    radial-gradient(60% 90% at 0% 100%, rgb(28 132 152 / 0.22), transparent 70%);
   --fg: rgb(240 240 240);
   --fg-muted: rgb(255 255 255 / 0.5);
   --divider: rgb(255 255 255 / 0.08);
@@ -61,6 +71,11 @@ body {
 
 ::selection {
   background: var(--selection);
+}
+
+/* 窗口底：渐变叠在半透明底色上，再透出原生 Acrylic */
+.surface {
+  background: var(--surface-gradient), var(--surface);
 }
 
 /* 细滚动条 */

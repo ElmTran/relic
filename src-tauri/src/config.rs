@@ -29,8 +29,8 @@ hide_on_blur = false              # 失焦时隐藏翻译窗口
 keep_result_in_clipboard = false  # 回填后把译文留在剪贴板里（尚未实现）
 
 [hotkeys]
-selection = "Alt+Q"               # 划词翻译（尚未实现）
-input = "Alt+W"                   # 输入翻译
+selection = "Alt+E"               # 划词翻译（尚未实现）
+input = "Alt+F"                   # 输入翻译
 
 [inline]                          # 双击空格内联翻译（尚未实现）
 enabled = true
@@ -131,7 +131,7 @@ pub struct Hotkeys {
 
 impl Default for Hotkeys {
     fn default() -> Self {
-        Self { selection: "Alt+Q".into(), input: "Alt+W".into() }
+        Self { selection: "Alt+E".into(), input: "Alt+F".into() }
     }
 }
 
