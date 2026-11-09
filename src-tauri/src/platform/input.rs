@@ -3,8 +3,9 @@
 use std::time::{Duration, Instant};
 
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYBDINPUT, KEYEVENTF_KEYUP, MAPVK_VK_TO_VSC,
-    MapVirtualKeyW, SendInput, VIRTUAL_KEY, VK_C, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT, VK_V,
+    GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP,
+    MAPVK_VK_TO_VSC,
+    MapVirtualKeyW, SendInput, VIRTUAL_KEY, VK_A, VK_C, VK_CONTROL, VK_INSERT, VK_LWIN, VK_MENU, VK_RIGHT, VK_RWIN, VK_SHIFT, VK_V,
 };
 
 pub const RELIC_MARK: usize = 0x5245_4C49; // "RELI"
@@ -14,13 +15,18 @@ const VK_MASK: VIRTUAL_KEY = VIRTUAL_KEY(0xE8);
 
 fn key(vk: VIRTUAL_KEY, up: bool) -> INPUT {
     let scan = unsafe { MapVirtualKeyW(vk.0 as u32, MAPVK_VK_TO_VSC) } as u16;
+    let mut flags = if up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS(0) };
+    // 方向键、Insert 是扩展键，不带这个标志有的应用会按扫描码当成小键盘
+    if vk == VK_RIGHT || vk == VK_INSERT {
+        flags |= KEYEVENTF_EXTENDEDKEY;
+    }
     INPUT {
         r#type: INPUT_KEYBOARD,
         Anonymous: INPUT_0 {
             ki: KEYBDINPUT {
                 wVk: vk,
                 wScan: scan,
-                dwFlags: if up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS(0) },
+                dwFlags: flags,
                 time: 0,
                 dwExtraInfo: RELIC_MARK,
             },
@@ -45,6 +51,21 @@ pub fn ctrl_c() {
 
 pub fn ctrl_v() {
     chord(&[VK_CONTROL, VK_V]);
+}
+
+pub fn ctrl_a() {
+    chord(&[VK_CONTROL, VK_A]);
+}
+
+/// 终端的通用粘贴键：Windows Terminal 默认绑定，控制台、PSReadLine、mintty 也都支持。
+/// （Ctrl+V 在 bash 里是"原样插入下一个字符"，只有终端接管时才是粘贴）
+pub fn shift_insert() {
+    chord(&[VK_SHIFT, VK_INSERT]);
+}
+
+/// → 键：把选区收起到末尾
+pub fn right() {
+    chord(&[VK_RIGHT]);
 }
 
 fn is_down(vk: VIRTUAL_KEY) -> bool {

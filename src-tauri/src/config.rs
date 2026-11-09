@@ -26,19 +26,17 @@ theme = "system"                  # system | light | dark
 primary_lang = "zh"               # 母语：原文是母语时译成第二语言，否则译成母语
 secondary_lang = "en"
 hide_on_blur = false              # 失焦时隐藏翻译窗口
-keep_result_in_clipboard = false  # 回填后把译文留在剪贴板里（尚未实现）
+keep_result_in_clipboard = false  # 回填后把译文留在剪贴板里
 
 [hotkeys]
-selection = "Alt+E"               # 划词翻译（尚未实现）
+selection = "Alt+E"               # 划词翻译
 input = "Alt+F"                   # 输入翻译
 
-[inline]                          # 双击空格内联翻译（尚未实现）
+[inline]                          # 双击 Alt 内联翻译：有选中翻译选中部分，否则翻译整个输入框
 enabled = true
-trigger = "double_space"          # double_space | triple_space
-interval_ms = 300
+interval_ms = 300                 # 两次单击 Alt 的最大间隔
 target_lang = "en"
-scope = "selection_or_all"        # 有选中翻译选中部分，否则翻译整个输入框
-blacklist = ["Code.exe", "WINWORD.EXE"]
+blacklist = []                    # 不启用的进程名，如 ["Code.exe"]
 
 [ai]
 active = "deepseek"               # 当前使用的服务，对应下面某个 id
@@ -105,7 +103,6 @@ pub struct General {
     pub primary_lang: String,
     pub secondary_lang: String,
     pub hide_on_blur: bool,
-    #[allow(dead_code)] // M2
     pub keep_result_in_clipboard: bool,
 }
 
@@ -124,7 +121,6 @@ impl Default for General {
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(default)]
 pub struct Hotkeys {
-    #[allow(dead_code)] // M2
     pub selection: String,
     pub input: String,
 }
@@ -135,44 +131,21 @@ impl Default for Hotkeys {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum InlineTrigger {
-    #[default]
-    DoubleSpace,
-    TripleSpace,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum InlineScope {
-    #[default]
-    SelectionOrAll,
-}
-
-/// 双击空格内联翻译，M3 使用
-#[allow(dead_code)]
+/// 双击 Alt 内联翻译
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(default)]
 pub struct Inline {
     pub enabled: bool,
-    pub trigger: InlineTrigger,
+    /// 两次单击 Alt 的最大间隔
     pub interval_ms: u64,
     pub target_lang: String,
-    pub scope: InlineScope,
+    /// 不启用的进程名（不区分大小写），如 "Code.exe"
     pub blacklist: Vec<String>,
 }
 
 impl Default for Inline {
     fn default() -> Self {
-        Self {
-            enabled: true,
-            trigger: InlineTrigger::DoubleSpace,
-            interval_ms: 300,
-            target_lang: "en".into(),
-            scope: InlineScope::SelectionOrAll,
-            blacklist: vec!["Code.exe".into(), "WINWORD.EXE".into()],
-        }
+        Self { enabled: true, interval_ms: 300, target_lang: "en".into(), blacklist: vec![] }
     }
 }
 
@@ -237,7 +210,6 @@ impl Default for Provider {
 #[serde(default)]
 pub struct Prompts {
     pub translate: String,
-    #[allow(dead_code)] // M3
     pub inline: String,
 }
 

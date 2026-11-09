@@ -21,6 +21,8 @@ export function TranslateWindow() {
   /** 底栏的短暂提示：已复制、回填失败原因 */
   const [notice, setNotice] = useState("");
   const noticeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  /** 终端模式（双击 Alt 时前台是终端）的目标语言；null 表示普通模式 */
+  const [composeTo, setComposeTo] = useState<string | null>(null);
 
   const sourceRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -112,13 +114,15 @@ export function TranslateWindow() {
   }, []);
 
   useEffect(() => {
-    const unlisten = events.onShow(({ mode, text }) => {
+    const unlisten = events.onShow(({ mode, text, to }) => {
       if (text !== null) {
+        // 终端模式：目标语言固定，翻译后再按 Enter 粘贴回终端
+        setComposeTo(mode === "compose" ? to : null);
         setSource(text);
         reset();
         if (text.trim()) translate(text);
       }
-      if (mode === "input") requestAnimationFrame(() => sourceRef.current?.focus());
+      if (mode !== "selection") requestAnimationFrame(() => sourceRef.current?.focus());
     });
     return () => {
       unlisten.then((f) => f());
@@ -174,7 +178,9 @@ export function TranslateWindow() {
     // 输入法选词时的 Enter 不算；Ctrl+Enter 是回填，交给全局处理
     if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      translate(source);
+      // 终端模式：原文没改过、译文已完成时，再按 Enter 粘贴回终端
+      if (composeTo !== null && canAct && lastRequest.current?.text === source) pasteBack();
+      else translate(source, composeTo);
     }
   };
 
@@ -186,6 +192,9 @@ export function TranslateWindow() {
     const last = lastRequest.current;
     if (last) translate(last.text, last.to);
   };
+
+  // 终端模式下译文完成后，底栏常驻提示下一步
+  const hint = notice || (composeTo !== null && canAct ? "再按 Enter 填入终端" : "");
 
   return (
     <div ref={rootRef} className="surface group flex h-full flex-col">
@@ -229,10 +238,10 @@ export function TranslateWindow() {
 
       <footer
         className={`flex h-9 shrink-0 items-center gap-0.5 pl-3.5 pr-1.5 transition-opacity duration-150 group-hover:opacity-100 ${
-          notice ? "opacity-100" : "opacity-0"
+          hint ? "opacity-100" : "opacity-0"
         }`}
       >
-        <span className="min-w-0 flex-1 truncate text-xs text-fg-muted">{notice}</span>
+        <span className="min-w-0 flex-1 truncate text-xs text-fg-muted">{hint}</span>
         <TextButton icon={<Copy size={13} />} disabled={!canAct} title="复制译文（Ctrl+C）" onClick={copy}>
           复制
         </TextButton>

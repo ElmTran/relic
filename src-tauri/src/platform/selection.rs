@@ -19,13 +19,15 @@ pub enum Via {
     Clipboard,
 }
 
-/// 返回选中的文本（可能为空）和取到它的方式
-pub fn get(owner: isize) -> (String, Via) {
+/// 返回选中的文本（可能为空）和取到它的方式。
+/// allow_copy=false 时不回退到 Ctrl+C（终端里 Ctrl+C 是中断）
+pub fn get(owner: isize, allow_copy: bool) -> (String, Via) {
     match uia_with_timeout() {
         // UIA 能用：有没有选中都以它为准。没选中时不回退，
         // 因为 VS Code 等编辑器没选中时按 Ctrl+C 会复制整行
         Some(text) => (text, Via::Uia),
-        None => (via_clipboard(owner).unwrap_or_default(), Via::Clipboard),
+        None if allow_copy => (via_clipboard(owner).unwrap_or_default(), Via::Clipboard),
+        None => (String::new(), Via::Uia),
     }
 }
 

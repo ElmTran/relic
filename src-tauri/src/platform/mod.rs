@@ -9,5 +9,7 @@ pub mod focus;
 #[cfg(windows)]
 pub mod input;
 #[cfg(windows)]
+pub mod keyhook;
+#[cfg(windows)]
 pub mod selection;
 pub mod shell;

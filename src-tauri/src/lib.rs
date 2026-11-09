@@ -43,18 +43,21 @@ pub fn run() {
         .manage(Hotkeys::default())
         .manage(orchestrator::Translator::new())
         .manage(orchestrator::PasteTarget::default())
+        .manage(orchestrator::InlineState::default())
         .setup(|app| {
             let handle = app.handle();
             config::init(handle)?;
             ui::setup(handle);
             tray::setup(handle)?;
             register_hotkeys(handle);
+            orchestrator::start_inline(handle);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             ui::hide,
             ui::get_theme,
             ui::resize_to_content,
+            ui::fit_indicator,
             orchestrator::translate,
             orchestrator::cancel,
             orchestrator::copy_text,
@@ -101,5 +104,6 @@ pub(crate) fn on_config_changed(app: &AppHandle, cfg: &config::Config) {
     ui::apply_theme(app);
     tray::sync_theme(app, cfg.general.theme);
     register_hotkeys(app);
+    orchestrator::start_inline(app);
     let _ = app.emit("relic://config-changed", ());
 }

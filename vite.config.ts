@@ -16,6 +16,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         translate: "src/windows/translate/index.html",
+        indicator: "src/windows/indicator/index.html",
       },
     },
   },

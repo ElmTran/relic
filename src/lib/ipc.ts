@@ -7,10 +7,14 @@ export type { TranslateEvent, TranslateRequest };
 export type ResolvedTheme = "light" | "dark";
 
 export interface ShowPayload {
-  mode: "selection" | "input";
+  mode: "selection" | "input" | "compose";
   /** null 表示保留窗口里现有内容 */
   text: string | null;
+  /** compose 模式下固定的目标语言 */
+  to: string | null;
 }
+
+export type IndicatorState = { state: "working" } | { state: "error"; message: string };
 
 export const ipc = {
   hide: () => invoke<void>("hide"),
@@ -24,6 +28,7 @@ export const ipc = {
   cancel: () => invoke<void>("cancel"),
   copyText: (text: string) => invoke<void>("copy_text", { text }),
   pasteBack: (text: string) => invoke<void>("paste_back", { text }),
+  fitIndicator: (width: number, height: number) => invoke<void>("fit_indicator", { width, height }),
 };
 
 export const events = {
@@ -31,6 +36,8 @@ export const events = {
     listen<ShowPayload>("relic://show", (e) => cb(e.payload)),
   onTheme: (cb: (t: ResolvedTheme) => void): Promise<UnlistenFn> =>
     listen<ResolvedTheme>("relic://theme", (e) => cb(e.payload)),
+  onIndicator: (cb: (s: IndicatorState) => void): Promise<UnlistenFn> =>
+    listen<IndicatorState>("relic://indicator", (e) => cb(e.payload)),
 };
 
 /** 把解析后的主题同步到 <html data-theme>，并跟随后续变化 */

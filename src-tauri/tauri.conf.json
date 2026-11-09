@@ -29,6 +29,24 @@
         "alwaysOnTop": true,
         "shadow": false,
         "windowEffects": { "effects": ["acrylic"] }
+      },
+      {
+        "label": "indicator",
+        "url": "src/windows/indicator/index.html",
+        "title": "Relic Indicator",
+        "width": 120,
+        "height": 32,
+        "visible": false,
+        "focus": false,
+        "decorations": false,
+        "transparent": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "alwaysOnTop": true,
+        "shadow": false,
+        "windowEffects": { "effects": ["acrylic"] }
       }
     ],
     "security": {
