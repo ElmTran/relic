@@ -1,59 +1,63 @@
-<img src="src-tauri/icons/128x128.png" width="96" alt="Relic 图标" align="right" />
+<img src="src-tauri/icons/128x128.png" width="96" alt="Relic icon" align="right" />
 
 # Relic
 
-一个自用的 Windows 桌面翻译工具：划词、输入、在任意输入框里就地翻译，译文流式显示。界面极简，原生磨砂窗口，AI 请求全部在本地 Rust 进程里发出。
+English | [中文](README.zh-CN.md)
+
+A small, fast translator for Windows that lives in the tray and stays out of your way. Select text anywhere and press a key, or type in Chinese and get natural, everyday English back without leaving the app you're in. Translations stream in as they're generated, and every AI request goes out from a local Rust process.
 
 <p>
-  <img src="docs/images/translate-light.png" width="49%" alt="翻译窗口（浅色）" />
-  <img src="docs/images/translate-dark.png" width="49%" alt="翻译窗口（深色）" />
+  <img src="docs/images/translate-light.png" width="49%" alt="Translation window, light theme" />
+  <img src="docs/images/translate-dark.png" width="49%" alt="Translation window, dark theme" />
 </p>
 
-## 功能
+## What it does
 
-- **划词翻译**：在任意应用里选中文字，按 `Alt+E`，翻译窗口出现在鼠标旁边并自动翻译。优先用 UI Automation 读取选区，不碰剪贴板。
-- **输入翻译**：按 `Alt+F` 呼出窗口，输入后按 Enter 翻译，Shift+Enter 换行。
-- **内联翻译**：在任意输入框里快速按两下 `Alt`，把内容就地替换成英文：有选中就只翻译选中部分，否则翻译整个输入框。适合在英文环境里聊天时打中文、发英文。在终端里会弹出输入框，翻译后再按 Enter 填回终端。
-- **复制与回填**：复制译文，或者按 `Ctrl+Enter` 把译文粘贴回原应用（划词时替换选中内容）。临时写入的剪贴板内容不会进 Win+V 历史，完成后恢复原来的剪贴板。
-- **自动方向**：原文是母语就译成第二语言，否则译成母语；点窗口左上角的方向标签可以反过来。
-- **口语化译文**：默认提示词让英文译文像母语者日常说话：短句、高频词和短语动词，方便顺便学口语。提示词可以在设置里改。
-- **多个 AI 服务**：支持 OpenAI 兼容（默认 DeepSeek）、Anthropic、Gemini 三种接口格式，可配置多个，随时切换。
-- **界面**：浅色、深色两套渐变主题（可跟随系统），原生 Acrylic 磨砂和圆角，窗口始终置顶、高度随内容变化。托盘菜单、开机自启。
+- **Translate a selection.** Highlight text in any app and press `Alt+E`. The window pops up next to your cursor and starts translating. Relic reads the selection through UI Automation when it can, so your clipboard is left alone.
+- **Translate what you type.** Press `Alt+F`, type, hit Enter.
+- **Translate in place.** Tap `Alt` twice inside any text box and its contents are swapped for the English version — just the selection if there is one, otherwise the whole box. Handy when you're chatting in English but thinking in Chinese. In a terminal, Relic opens a small input box instead and pastes the result back for you.
+- **Paste it back.** Copy the translation, or press `Ctrl+Enter` to drop it into the app you came from, replacing the original selection. The temporary clipboard content never shows up in Win+V history, and your previous clipboard is restored afterwards.
+- **Picks the direction for you.** Text in your native language goes to your second language; everything else comes back to your native language. Click the language label to flip it.
+- **Sounds like a person, not a textbook.** The default prompt asks for short sentences and the words native speakers actually use, so you pick up common phrasing as you go. You can rewrite the prompts in Settings.
+- **Bring your own model.** OpenAI-compatible APIs (DeepSeek by default), Anthropic, and Gemini. Set up as many as you like and switch between them.
+- **Looks at home on Windows 11.** Native acrylic blur and rounded corners, a light and a dark gradient theme (or follow the system), always on top, and the window grows with the text. Tray menu and launch at startup included.
 
-## 快捷键
+## Shortcuts
 
-| 范围 | 按键 | 作用 |
+| Where | Keys | Action |
 |---|---|---|
-| 全局 | `Alt+E`（可改） | 划词翻译 |
-| 全局 | `Alt+F`（可改） | 输入翻译 |
-| 全局 | 快速按两下 `Alt` | 内联翻译（可关闭） |
-| 翻译窗口 | `Enter` / `Shift+Enter` | 翻译 / 换行 |
-| 翻译窗口 | `Esc` | 翻译中取消，否则隐藏窗口 |
-| 翻译窗口 | `Ctrl+C` | 没有选中文字时复制译文 |
-| 翻译窗口 | `Ctrl+Enter` | 回填到原应用 |
+| Anywhere | `Alt+E` (configurable) | Translate selection |
+| Anywhere | `Alt+F` (configurable) | Open the translation window |
+| Anywhere | Double-tap `Alt` | Translate in place (can be turned off) |
+| Translation window | `Enter` / `Shift+Enter` | Translate / new line |
+| Translation window | `Esc` | Cancel while translating, otherwise hide |
+| Translation window | `Ctrl+C` | Copy the translation when nothing is selected |
+| Translation window | `Ctrl+Enter` | Paste back into the previous app |
 
-## 设置
+## Settings
 
-托盘菜单 → 打开设置。改完立即生效，也可以直接编辑配置文件 `%APPDATA%\com.relic.app\config.toml`（保存后自动重新加载）。
+Open them from the tray menu. Changes apply immediately. If you'd rather edit by hand, everything lives in `%APPDATA%\com.relic.app\config.toml`, and Relic reloads it as soon as you save. Comments you add there are kept when the app writes to the file.
 
-<img src="docs/images/settings.png" width="70%" alt="设置窗口" />
+<img src="docs/images/settings.png" width="70%" alt="Settings window" />
 
-## 技术栈
+The interface is in Chinese for now.
 
-| 层 | 选择 |
+## Under the hood
+
+| Layer | Choice |
 |---|---|
-| 壳 | [Tauri v2](https://tauri.app) |
-| 前端 | React 19、TypeScript、Tailwind CSS 4、Vite（不用组件库和状态库） |
-| 后端 | Rust：AI 请求（reqwest，SSE 流式解析）、配置（toml / toml_edit，热重载）、语言检测（whatlang + 文字系统判断） |
-| 系统交互 | `windows` crate：UI Automation 取词、SendInput、低级键盘钩子、Win32 剪贴板、DWM 圆角与磨砂 |
-| 前后端类型 | ts-rs 从 Rust 类型生成 TypeScript 类型 |
-| 打包 | NSIS 安装包，按当前用户安装 |
+| Shell | [Tauri v2](https://tauri.app) |
+| UI | React 19, TypeScript, Tailwind CSS 4, Vite — no component or state libraries |
+| Core | Rust: AI requests (reqwest with a small SSE parser), config (toml / toml_edit with hot reload), language detection (whatlang plus script-based rules) |
+| Windows integration | `windows` crate: UI Automation, SendInput, a low-level keyboard hook, the Win32 clipboard, DWM corners and backdrop |
+| Shared types | ts-rs generates the TypeScript types from Rust |
+| Installer | NSIS, per-user, no admin rights needed |
 
-只支持 Windows 11（核心功能依赖 Win32）。设计细节见 [docs/design.md](docs/design.md)。
+Relic targets Windows 11 only — the core features depend on Win32. Design notes (in Chinese) are in [docs/design.md](docs/design.md).
 
-## 开发
+## Building
 
-需要 Rust（MSVC 工具链）、Visual Studio Build Tools（"使用 C++ 的桌面开发"）、Node.js 和 pnpm。
+You'll need Rust with the MSVC toolchain, Visual Studio Build Tools with the "Desktop development with C++" workload, Node.js, and pnpm.
 
 ```bash
 pnpm install
@@ -63,13 +67,13 @@ pnpm install
 pnpm tauri dev
 ```
 
-打包，生成 `src-tauri/target/release/bundle/nsis/Relic_<版本>_x64-setup.exe`：
+To build the installer (it ends up in `src-tauri/target/release/bundle/nsis/`):
 
 ```bash
 pnpm tauri build
 ```
 
-Rust 单元测试（同时更新 `src/lib/bindings/` 下的 TS 类型）：
+Rust tests, which also regenerate the TypeScript bindings in `src/lib/bindings/`:
 
 ```bash
 cd src-tauri && cargo test
