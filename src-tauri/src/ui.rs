@@ -1,24 +1,17 @@
 //! 窗口创建后的设置、定位、显示和隐藏，以及主题。
 
-use std::sync::Mutex;
-
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, Theme, WebviewWindow, WindowEvent};
+use tauri::{
+    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Theme, WebviewWindow, WindowEvent,
+};
+
+use crate::config::{self, ThemeSetting};
 
 pub const TRANSLATE: &str = "translate";
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
-pub enum ThemeSetting {
-    #[default]
-    System,
-    Light,
-    Dark,
-}
-
-#[derive(Default)]
-pub struct UiState {
-    theme: Mutex<ThemeSetting>,
-}
+/// 翻译窗口高度范围：最小值（逻辑像素）和占显示器工作区高度的最大比例
+const MIN_HEIGHT: f64 = 100.0;
+const MAX_HEIGHT_RATIO: f64 = 0.6;
 
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -42,6 +35,7 @@ fn translate_window(app: &AppHandle) -> Option<WebviewWindow> {
 pub fn setup(app: &AppHandle) {
     let win = translate_window(app).expect("translate 窗口未创建");
     crate::platform::effects::round_corners(&win);
+    apply_theme(app);
 
     let handle = app.clone();
     win.on_window_event(move |event| match event {
@@ -50,6 +44,7 @@ pub fn setup(app: &AppHandle) {
             api.prevent_close();
             hide_translate(&handle);
         }
+        WindowEvent::Focused(false) if config::get(&handle).general.hide_on_blur => hide_translate(&handle),
         WindowEvent::ThemeChanged(_) => emit_theme(&handle),
         _ => {}
     });
@@ -93,11 +88,10 @@ fn center_on_cursor_monitor(app: &AppHandle, win: &WebviewWindow) -> Option<Phys
     ))
 }
 
-pub fn set_theme(app: &AppHandle, setting: ThemeSetting) {
-    *app.state::<UiState>().theme.lock().unwrap() = setting;
+/// 按配置设置窗口主题（原生 Acrylic 的色调跟着变），并通知前端
+pub fn apply_theme(app: &AppHandle) {
     if let Some(win) = translate_window(app) {
-        // 原生 Acrylic 的色调跟着窗口主题变
-        let _ = win.set_theme(match setting {
+        let _ = win.set_theme(match config::get(app).general.theme {
             ThemeSetting::System => None,
             ThemeSetting::Light => Some(Theme::Light),
             ThemeSetting::Dark => Some(Theme::Dark),
@@ -107,8 +101,7 @@ pub fn set_theme(app: &AppHandle, setting: ThemeSetting) {
 }
 
 fn resolved_theme(app: &AppHandle) -> &'static str {
-    let setting = *app.state::<UiState>().theme.lock().unwrap();
-    let theme = match setting {
+    let theme = match config::get(app).general.theme {
         ThemeSetting::Light => Theme::Light,
         ThemeSetting::Dark => Theme::Dark,
         ThemeSetting::System => translate_window(app)
@@ -135,4 +128,31 @@ pub fn hide(app: AppHandle) {
 #[tauri::command]
 pub fn get_theme(app: AppHandle) -> &'static str {
     resolved_theme(&app)
+}
+
+/// 高度随内容变化（宽度不动），超过上限由前端滚动；窗口底部不超出工作区
+#[tauri::command]
+pub fn resize_to_content(window: WebviewWindow, height: f64) -> Result<(), String> {
+    let run = || -> tauri::Result<()> {
+        let Some(monitor) = window.current_monitor()? else { return Ok(()) };
+        let scale = window.scale_factor()?;
+        let area = monitor.work_area();
+        let max = (area.size.height as f64 * MAX_HEIGHT_RATIO).max(MIN_HEIGHT * scale);
+        let target = (height * scale).round().clamp(MIN_HEIGHT * scale, max) as u32;
+
+        let size = window.inner_size()?;
+        if size.height == target {
+            return Ok(());
+        }
+        window.set_size(PhysicalSize::new(size.width, target))?;
+
+        let pos = window.outer_position()?;
+        let area_bottom = area.position.y + area.size.height as i32;
+        if pos.y + target as i32 > area_bottom {
+            let y = (area_bottom - target as i32).max(area.position.y);
+            window.set_position(PhysicalPosition::new(pos.x, y))?;
+        }
+        Ok(())
+    };
+    run().map_err(|e| e.to_string())
 }

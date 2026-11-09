@@ -11,5 +11,7 @@
 
 - 设计已定稿到 v0.2。
 - Windows 工具链已就绪（2026-11-09）：Rust stable-msvc（`RUSTUP_HOME`/`CARGO_HOME` 在 `D:\software\dev\`）、VS 2022 Build Tools C++ 工作负载（`D:\software\dev\VSBuildTools`）、Node + pnpm（store 在 `D:\.pnpm-store`）、WebView2。
-- M0 代码已完成（2026-11-09），等用户验收视觉效果：Acrylic + 原生圆角已生效，`show_translate` 耗时约 20–35ms。
-- 下一步：M0 验收后进入 M1。
+- M0 已完成并提交（2026-11-09）。
+- M1 已完成并提交（2026-11-09）：config.toml 热重载、OpenAI 格式流式翻译与取消、语言检测、输入翻译、窗口高度自适应、托盘"打开设置"。用户用的是国内自定义 OpenAI 兼容服务（base_url 需带 /v1）。
+- 下一步：M2 划词与回填。
+- 开发命令：`pnpm tauri dev`；Rust 测试 `cd src-tauri && cargo test`（同时更新 `src/lib/bindings/` 的 TS 类型）。当前 PowerShell 会话里需要先设好 `RUSTUP_HOME`/`CARGO_HOME`/PATH 才能用 cargo。

@@ -39,7 +39,7 @@
 
 ```
 ╭────────────────────────────────────╮
-│ 中文 → English                 ✕ │  ← 整行可拖拽，图标平时淡显
+│ 中文 → English                 ✕ │  ← 整行可拖拽，图标平时淡显；方向标签可点击切换
 │ 原文（可编辑，默认最多显示 3 行）       │
 │ ────────────────────────────────── │  ← 1px 细分隔线
 │ 译文（流式输出）                       │
@@ -48,7 +48,9 @@
 ╰────────────────────────────────────╯
 ```
 
-- 高度随内容自动变化，超过上限后滚动。宽度可以拖动调整，并记住。
+- 高度随内容自动变化，上限为显示器工作区高度的 60%，超过后译文区滚动；窗口底部不会超出工作区。宽度可以拖动调整，并记住（目前只在本次运行内记住，持久化待定）。
+- 方向标签：翻译前显示"自动检测"；翻译后显示"原文语言 → 目标语言"，点击切换为另一个方向，并重新翻译。改了原文再按 Enter，又回到自动方向。
+- 翻译失败时，在译文区显示错误原因和"重试"按钮。
 - **窗口行为**
   - 划词翻译：出现在鼠标附近，限制在当前显示器工作区内。
   - 输入翻译：出现在当前显示器中央。
@@ -142,16 +144,18 @@ relic/
 ### 4.4 IPC
 
 - **命令**
-  - `translate(req, channel)`：结果通过 Channel 推送，事件依次为 `Started → Delta* → Done | Error`
+  - `translate(req, channel)`：结果通过 Channel 推送，事件依次为 `Started → Delta* → Done | Error`。`Started` 带方向信息，`Done` 带后处理后的完整译文，前端用它替换流式拼出的内容
   - `cancel`
-  - `get_config`、`set_config`
-  - `copy_text`
-  - `paste_back`
   - `hide`
+  - `get_theme`
   - `resize_to_content`
+  - M2：`copy_text`、`paste_back`
+  - M4（设置窗口）：`get_config`、`set_config`
 - **事件**
-  - `relic://show`：载荷为 `{ mode: "selection" | "input", text }`
+  - `relic://show`：载荷为 `{ mode: "selection" | "input", text }`，`text` 为 null 时保留窗口现有内容
+  - `relic://theme`：解析后的主题 `light | dark`
   - `relic://config-changed`
+- 前后端共用的类型由 ts-rs 生成到 `src/lib/bindings/`，在 `src-tauri` 下运行 `cargo test` 时更新。
 
 ## 5. 关键实现方案
 
@@ -219,22 +223,26 @@ relic/
   - 解析流式事件里的增量文本；
   - 解析非流式响应。
   - SSE 解析、超时、取消这些是公共逻辑。
-- **取消**：每次请求有一个 id，发起新请求时中止还在进行的请求（对 tokio 任务调用 abort）。
-- **后处理**：去掉模型自己加的首尾引号或代码块标记。
-- **提示词**：系统提示词固定不变，原文放在最后。这样可以命中 DeepSeek 自动的上下文缓存（Context Caching on Disk），降低延迟和费用。
-- **网络**：默认跟随系统代理；连接超时 5 秒；不自动重试，界面上提供重试按钮。
+- **取消**：发起新请求时中止还在进行的请求（对 tokio 任务调用 abort）。前端给每次请求编号，只处理最新一次的事件。
+- **后处理**：去掉模型自己加的首尾引号或代码块标记（原文本身就带的不去）。
+- **提示词**：系统提示词只含 `{from}` `{to}` 两个变量，原文总是作为最后一条用户消息单独发送。这样系统提示词基本固定，可以命中 DeepSeek 自动的上下文缓存（Context Caching on Disk），降低延迟和费用。
+- **网络**：默认跟随系统代理；连接超时 5 秒；不自动重试，界面上提供重试按钮。HTTP 客户端全局复用，保持连接以降低延迟；TLS 用 Windows 自带的 schannel；带 `User-Agent: Relic/<版本>`（有的服务对没有 UA 的请求直接 403）。
+- **地址**：请求地址是 `base_url` + `/chat/completions`。DeepSeek 官方不需要 `/v1`，但多数兼容服务的 `base_url` 要以 `/v1` 结尾，否则路径不存在，可能返回 403 而不是 404。
+- **DeepSeek（2026-11 文档）**：当前模型名为 `deepseek-flash`（旧的 `deepseek-chat` 已下线）。所有模型**默认开启思考模式**，开启时 `temperature` 无效、延迟高，所以默认配置用 `extra_body` 关闭：`{ thinking = { type = "disabled" } }`。`extra_body` 是通用字段，会原样合并进请求体顶层。
 
 ### 5.7 语言检测
 
-- 先按字符所属的文字系统判断：有假名就是日文，有谚文就是韩文，汉字占比超过阈值就是中文。中英混排的情况按汉字和拉丁单词的比例判断。
-- 其他情况交给 `whatlang`（体积小、速度快），不用 lingua，因为它的模型太大。
+- 先按字符所属的文字系统判断：有假名就是日文，有谚文就是韩文；有汉字时，一个汉字按半个拉丁单词算，汉字多就是中文（中英混排按这个比例判断）。
+- 其他情况交给 `whatlang`（体积小、速度快），不用 lingua，因为它的模型太大。拉丁字母的短文本（少于 5 个单词）whatlang 不可靠时按英文处理。
 - 翻译方向：检测结果等于母语就译成第二语言，否则译成母语。
 
 ### 5.8 配置
 
-- 位置：`%APPDATA%/<identifier>/config.toml`。
+- 位置：`%APPDATA%/com.relic.app/config.toml`。首次启动写出带注释的模板（单元测试保证模板和代码里的默认值一致）。
 - Rust 里有一个带类型的 `Config` 结构体，加了 `#[serde(default)]`，缺少的字段自动用默认值。Rust 是配置的唯一来源，前端只能通过命令读写。
-- 监听配置文件变化：手动改文件也会热重载，并广播 `config-changed`。
+- 监听配置文件变化（监听所在目录，兼容"写临时文件再改名"的编辑器，防抖 150ms）：手动改文件也会热重载，主题、热键立即生效，并广播 `config-changed`。文件写错时保留当前配置；启动时就写错则用默认值，但不覆盖用户的文件。
+- 程序自己改配置（如托盘切换主题）时用 `toml_edit` 只改对应的键，保留用户的注释和格式。
+- 设置窗口做出来之前（M4），托盘的"打开设置"直接用默认程序打开 config.toml，没有关联程序时用记事本。
 - API key 先明文存在配置文件里（只有当前用户能访问的目录）。以后可以改成存到 Windows 凭据管理器（`keyring` crate）。
 
 ```toml
@@ -265,12 +273,13 @@ id = "deepseek"
 format = "openai"           # openai | anthropic | gemini
 base_url = "https://api.deepseek.com"
 api_key = "sk-..."
-model = "deepseek-chat"     # 非思考模型，具体名称以 DeepSeek 文档为准
+model = "deepseek-flash"
 temperature = 1.3           # DeepSeek 文档对翻译场景的推荐值
 stream = true
+extra_body = { thinking = { type = "disabled" } }   # 原样合并进请求体
 
 [prompts]
-translate = """..."""       # 可用变量：{text} {from} {to}
+translate = """..."""       # 系统提示词，可用变量：{from} {to}；原文作为用户消息单独发送
 inline = """..."""
 ```
 
