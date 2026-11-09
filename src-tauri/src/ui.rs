@@ -169,6 +169,11 @@ fn emit_theme(app: &AppHandle) {
 
 // ---- 设置窗口（按需创建，关闭即销毁）----
 
+/// 托盘、任务栏这类 16–32px 的地方用加粗简化版图标；铅笔细线的大图标缩到这么小会糊
+pub fn small_icon() -> tauri::image::Image<'static> {
+    tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png")).expect("tray.png 不是有效的 PNG")
+}
+
 pub fn open_settings(app: &AppHandle) {
     if let Some(win) = app.get_webview_window(SETTINGS) {
         let _ = win.unminimize();
@@ -184,17 +189,20 @@ pub fn open_settings(app: &AppHandle) {
     let url = tauri::WebviewUrl::App("src/windows/settings/index.html".into());
     let built = tauri::WebviewWindowBuilder::new(app, SETTINGS, url)
         .title("Relic 设置")
-        .inner_size(780.0, 560.0)
-        .min_inner_size(640.0, 440.0)
-        .center()
-        // 透明 + Mica：系统标题栏下面是 Win11 原生的 Mica 背景，打开时也不会白屏一闪
-        .transparent(true)
-        .effects(tauri::utils::config::WindowEffectsConfig {
-            effects: vec![tauri::window::Effect::Mica],
-            ..Default::default()
+        .icon(small_icon())
+        .and_then(|b| {
+            Ok(b.inner_size(780.0, 560.0)
+                .min_inner_size(640.0, 440.0)
+                .center()
+                // 透明 + Mica：系统标题栏下面是 Win11 原生的 Mica 背景，打开时也不会白屏一闪
+                .transparent(true)
+                .effects(tauri::utils::config::WindowEffectsConfig {
+                    effects: vec![tauri::window::Effect::Mica],
+                    ..Default::default()
+                })
+                .theme(theme))
         })
-        .theme(theme)
-        .build();
+        .and_then(|b| b.build());
     if let Err(e) = built {
         eprintln!("[relic] 打开设置窗口失败: {e}");
     }

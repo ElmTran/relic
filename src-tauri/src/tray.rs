@@ -33,7 +33,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     app.manage(ThemeItems(theme_items));
 
     TrayIconBuilder::with_id("main")
-        .icon(app.default_window_icon().expect("缺少应用图标").clone())
+        .icon(ui::small_icon())
         .tooltip("Relic")
         .menu(&menu)
         .show_menu_on_left_click(false)
