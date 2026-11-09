@@ -9,6 +9,7 @@ use crate::config::{self, ThemeSetting};
 
 pub const TRANSLATE: &str = "translate";
 pub const INDICATOR: &str = "indicator";
+pub const SETTINGS: &str = "settings";
 
 /// 翻译窗口高度范围：最小值（逻辑像素）和占显示器工作区高度的最大比例
 const MIN_HEIGHT: f64 = 100.0;
@@ -142,7 +143,7 @@ pub fn apply_theme(app: &AppHandle) {
         ThemeSetting::Light => Some(Theme::Light),
         ThemeSetting::Dark => Some(Theme::Dark),
     };
-    for win in [translate_window(app), indicator_window(app)].into_iter().flatten() {
+    for win in app.webview_windows().into_values() {
         let _ = win.set_theme(theme);
     }
     emit_theme(app);
@@ -164,6 +165,39 @@ fn resolved_theme(app: &AppHandle) -> &'static str {
 
 fn emit_theme(app: &AppHandle) {
     let _ = app.emit("relic://theme", resolved_theme(app));
+}
+
+// ---- 设置窗口（按需创建，关闭即销毁）----
+
+pub fn open_settings(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window(SETTINGS) {
+        let _ = win.unminimize();
+        let _ = win.show();
+        let _ = win.set_focus();
+        return;
+    }
+    let theme = match config::get(app).general.theme {
+        ThemeSetting::System => None,
+        ThemeSetting::Light => Some(Theme::Light),
+        ThemeSetting::Dark => Some(Theme::Dark),
+    };
+    let url = tauri::WebviewUrl::App("src/windows/settings/index.html".into());
+    let built = tauri::WebviewWindowBuilder::new(app, SETTINGS, url)
+        .title("Relic 设置")
+        .inner_size(780.0, 560.0)
+        .min_inner_size(640.0, 440.0)
+        .center()
+        // 透明 + Mica：系统标题栏下面是 Win11 原生的 Mica 背景，打开时也不会白屏一闪
+        .transparent(true)
+        .effects(tauri::utils::config::WindowEffectsConfig {
+            effects: vec![tauri::window::Effect::Mica],
+            ..Default::default()
+        })
+        .theme(theme)
+        .build();
+    if let Err(e) = built {
+        eprintln!("[relic] 打开设置窗口失败: {e}");
+    }
 }
 
 // ---- 浮标 ----

@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* dark: 变体跟随 Relic 的主题设置，而不是系统偏好 */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* 主题变量：叠加在原生 Acrylic 上的半透明底色 + 柔和的多色渐变。圆角和外框由 DWM 原生绘制，CSS 不画。 */
 :root,
 :root[data-theme="light"] {
@@ -17,6 +20,12 @@
   --accent: rgb(0 95 184);
   --selection: rgb(0 95 184 / 0.22);
   --danger: rgb(196 43 28);
+  /* 设置窗口：Mica 上的卡片和输入框 */
+  --card: rgb(255 255 255 / 0.6);
+  --card-border: rgb(0 0 0 / 0.06);
+  --field: rgb(255 255 255 / 0.75);
+  --field-border: rgb(0 0 0 / 0.1);
+  --option-bg: rgb(249 249 249);
   color-scheme: light;
 }
 
@@ -35,6 +44,11 @@
   --accent: rgb(96 205 255);
   --selection: rgb(96 205 255 / 0.28);
   --danger: rgb(255 153 164);
+  --card: rgb(255 255 255 / 0.04);
+  --card-border: rgb(0 0 0 / 0.2);
+  --field: rgb(255 255 255 / 0.06);
+  --field-border: rgb(255 255 255 / 0.08);
+  --option-bg: rgb(44 44 44);
   color-scheme: dark;
 }
 
@@ -47,6 +61,10 @@
   --color-active: var(--active);
   --color-accent: var(--accent);
   --color-danger: var(--danger);
+  --color-card: var(--card);
+  --color-card-border: var(--card-border);
+  --color-field: var(--field);
+  --color-field-border: var(--field-border);
   --font-sans: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", sans-serif;
 }
 
@@ -71,6 +89,13 @@ body {
 
 ::selection {
   background: var(--selection);
+}
+
+/* 原生下拉框的选项列表是系统弹出层，不跟随 color-scheme，显式给颜色，
+   否则深色主题下会是白底浅字 */
+option {
+  background-color: var(--option-bg);
+  color: var(--fg);
 }
 
 /* 窗口底：渐变叠在半透明底色上，再透出原生 Acrylic */

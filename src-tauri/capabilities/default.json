@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "翻译窗口和浮标的权限",
-  "windows": ["translate", "indicator"],
+  "description": "Relic 各窗口的权限",
+  "windows": ["translate", "indicator", "settings"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging"

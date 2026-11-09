@@ -17,6 +17,7 @@ export default defineConfig({
       input: {
         translate: "src/windows/translate/index.html",
         indicator: "src/windows/indicator/index.html",
+        settings: "src/windows/settings/index.html",
       },
     },
   },

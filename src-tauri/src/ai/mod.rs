@@ -1,6 +1,8 @@
 //! AI 服务：适配器只负责构造请求和解析响应，发送、SSE、错误处理是公共逻辑。
 //! 取消由调用方 abort 任务实现。
 
+mod anthropic;
+mod gemini;
 mod openai;
 pub mod prompt;
 mod sse;
@@ -33,7 +35,8 @@ trait Adapter: Sync {
 fn adapter(format: ApiFormat) -> Result<&'static dyn Adapter, String> {
     match format {
         ApiFormat::Openai => Ok(&openai::OpenAi),
-        ApiFormat::Anthropic | ApiFormat::Gemini => Err("暂时只支持 openai 格式".into()),
+        ApiFormat::Anthropic => Ok(&anthropic::Anthropic),
+        ApiFormat::Gemini => Ok(&gemini::Gemini),
     }
 }
 
@@ -102,12 +105,21 @@ pub async fn complete(
     Ok(full)
 }
 
-/// 把 extra_body 的顶层字段合并进请求体
+/// 把 extra_body 深度合并进请求体：对象逐层合并，其他值直接覆盖
 fn merge_extra(body: &mut Value, extra: Option<&Value>) {
-    if let (Some(Value::Object(extra)), Value::Object(body)) = (extra, body) {
-        for (k, v) in extra {
-            body.insert(k.clone(), v.clone());
+    if let Some(extra) = extra {
+        deep_merge(body, extra);
+    }
+}
+
+fn deep_merge(base: &mut Value, patch: &Value) {
+    match (base, patch) {
+        (Value::Object(base), Value::Object(patch)) => {
+            for (k, v) in patch {
+                deep_merge(base.entry(k.clone()).or_insert(Value::Null), v);
+            }
         }
+        (base, patch) => *base = patch.clone(),
     }
 }
 
@@ -158,11 +170,14 @@ mod live_tests {
         let cfg: Config = toml::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
         let provider = cfg.ai.active_provider().unwrap();
         let client = client();
-        for (text, from, to) in [
-            ("今天天气不错，我们去公园散步吧。", "Simplified Chinese", "English"),
-            ("The quick brown fox jumps over the lazy dog.", "English", "Simplified Chinese"),
+        for (prompt, text, from, to) in [
+            (&cfg.prompts.translate, "今天天气不错，我们去公园散步吧。", "Simplified Chinese", "English"),
+            (&cfg.prompts.translate, "The quick brown fox jumps over the lazy dog.", "English", "Simplified Chinese"),
+            (&cfg.prompts.translate, "鉴于目前项目进度有所延迟，我们需要重新评估资源分配并调整后续的里程碑安排。", "Simplified Chinese", "English"),
+            (&cfg.prompts.inline, "不好意思，我刚才在开会没看到消息，这个问题我晚点再跟你确认一下。", "Simplified Chinese", "English"),
+            (&cfg.prompts.inline, "这个方案我觉得总体上没什么问题，不过成本方面可能还需要再优化一下。", "Simplified Chinese", "English"),
         ] {
-            let req = ChatRequest { system: prompt::render(&cfg.prompts.translate, from, to), user: text.into() };
+            let req = ChatRequest { system: prompt::render(prompt, from, to), user: text.into() };
             let start = std::time::Instant::now();
             let mut first = None;
             let mut chunks = 0;

@@ -123,7 +123,8 @@ pub fn on_hotkey(app: &AppHandle, mode: ShowMode) {
         {
             let own = ui::translate_hwnd(&app);
             let fg = platform::focus::foreground();
-            let from_other = fg.is_some() && fg != own;
+            // 前台是 Relic 自己的任何窗口（翻译、设置）都不算"其他应用"
+            let from_other = fg.is_some_and(|h| !platform::focus::is_own(h));
             if from_other {
                 *app.state::<PasteTarget>().0.lock().unwrap() = fg;
             }
@@ -317,7 +318,7 @@ fn run_inline(app: &AppHandle) {
         focus::is_terminal(target)
     );
     let owner = ui::translate_hwnd(app).unwrap_or(0);
-    if target == owner {
+    if focus::is_own(target) {
         return;
     }
     if let Some(name) = focus::process_name(target) {

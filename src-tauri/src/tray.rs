@@ -1,4 +1,4 @@
-//! 托盘：显示窗口、主题、打开设置（暂时直接打开 config.toml）、退出。
+//! 托盘：显示窗口、主题、打开设置、退出。
 
 use tauri::{
     AppHandle, Manager, Wry,
@@ -39,7 +39,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "show" => ui::show_translate(app, ShowMode::Input, None),
-            "settings" => crate::platform::shell::open_path(&config::path(app)),
+            "settings" => ui::open_settings(app),
             "quit" => app.exit(0),
             id => {
                 if let Some(&(setting, _, _)) = THEMES.iter().find(|t| t.1 == id) {

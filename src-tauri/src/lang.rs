@@ -21,6 +21,11 @@ fn find(code: &str) -> Option<&'static (&'static str, &'static str, &'static str
     LANGS.iter().find(|(c, _, _)| *c == code)
 }
 
+/// 所有支持的语言：(代码, 界面显示名)
+pub fn all() -> impl Iterator<Item = (&'static str, &'static str)> {
+    LANGS.iter().map(|&(code, name, _)| (code, name))
+}
+
 /// 界面显示名，未知代码原样返回
 pub fn display_name(code: &str) -> String {
     find(code).map_or_else(|| code.to_string(), |l| l.1.to_string())

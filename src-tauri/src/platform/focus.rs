@@ -62,6 +62,13 @@ pub fn class_name(hwnd: isize) -> String {
     String::from_utf16_lossy(&buf[..len.max(0) as usize])
 }
 
+/// 是不是 Relic 自己的窗口（翻译窗口、设置窗口、浮标）
+pub fn is_own(hwnd: isize) -> bool {
+    let mut pid = 0;
+    unsafe { GetWindowThreadProcessId(HWND(hwnd as _), Some(&mut pid)) };
+    pid == std::process::id()
+}
+
 /// 窗口所属进程的文件名，如 "Code.exe"
 pub fn process_name(hwnd: isize) -> Option<String> {
     unsafe {

@@ -27,7 +27,7 @@
 
 ### 后续（P1）
 
-历史记录（SQLite 全文搜索）、截图 OCR 和截图翻译（Windows.Media.Ocr 或 LLM 视觉）、TTS、提示词预设（润色、解释）、开机自启、命令行调用。
+历史记录（SQLite 全文搜索）、截图 OCR 和截图翻译（Windows.Media.Ocr 或 LLM 视觉）、TTS、提示词预设（润色、解释）、命令行调用。（开机自启已在 M4 做了）
 
 ### 不做
 
@@ -152,10 +152,12 @@ relic/
   - `get_theme`
   - `resize_to_content`
   - M2：`copy_text`、`paste_back`
-  - M4（设置窗口）：`get_config`、`set_config`
+  - M3：`fit_indicator`（浮标按内容调整大小）
+  - M4（设置窗口）：`get_config`、`set_config`（校验后保存，返回热键被占用等提示）、`get_autostart`、`set_autostart`、`suspend_hotkeys`、`list_languages`、`open_config_file`
 - **事件**
-  - `relic://show`：载荷为 `{ mode: "selection" | "input", text }`，`text` 为 null 时保留窗口现有内容
-  - `relic://theme`：解析后的主题 `light | dark`
+  - `relic://show`：载荷为 `{ mode: "selection" | "input" | "compose", text, to }`，`text` 为 null 时保留窗口现有内容；`to` 是 compose（终端）模式固定的目标语言
+  - `relic://theme`：解析后的主题 `light | dark`，发给所有窗口
+  - `relic://indicator`：浮标状态 `working | error`
   - `relic://config-changed`
 - 前后端共用的类型由 ts-rs 生成到 `src/lib/bindings/`，在 `src-tauri` 下运行 `cargo test` 时更新。
 
@@ -239,7 +241,12 @@ relic/
 - **提示词**：系统提示词只含 `{from}` `{to}` 两个变量，原文总是作为最后一条用户消息单独发送。这样系统提示词基本固定，可以命中 DeepSeek 自动的上下文缓存（Context Caching on Disk），降低延迟和费用。
 - **网络**：默认跟随系统代理；连接超时 5 秒；不自动重试，界面上提供重试按钮。HTTP 客户端全局复用，保持连接以降低延迟；TLS 用 Windows 自带的 schannel；带 `User-Agent: Relic/<版本>`（有的服务对没有 UA 的请求直接 403）。
 - **地址**：请求地址是 `base_url` + `/chat/completions`。DeepSeek 官方不需要 `/v1`，但多数兼容服务的 `base_url` 要以 `/v1` 结尾，否则路径不存在，可能返回 403 而不是 404。
-- **DeepSeek（2026-11 文档）**：当前模型名为 `deepseek-flash`（旧的 `deepseek-chat` 已下线）。所有模型**默认开启思考模式**，开启时 `temperature` 无效、延迟高，所以默认配置用 `extra_body` 关闭：`{ thinking = { type = "disabled" } }`。`extra_body` 是通用字段，会原样合并进请求体顶层。
+- **DeepSeek（2026-11 文档）**：当前模型名为 `deepseek-flash`（旧的 `deepseek-chat` 已下线）。所有模型**默认开启思考模式**，开启时 `temperature` 无效、延迟高，所以默认配置用 `extra_body` 关闭：`{ thinking = { type = "disabled" } }`。`extra_body` 是通用字段，**深度合并**进请求体（对象逐层合并，其他值覆盖），这样给 Gemini 加 `generationConfig.thinkingConfig` 不会覆盖掉 `temperature`。
+- **三种格式**（`base_url` 后面拼的路径）：
+  - OpenAI 兼容：`/chat/completions`，`Authorization: Bearer`；只取 `delta.content`，忽略 `reasoning_content`；`[DONE]` 结束。
+  - Anthropic：`/messages`（`base_url` 形如 `https://api.anthropic.com/v1`），`x-api-key` + `anthropic-version: 2026-10-21`；`max_tokens` 必填（8192）；这个 API 版本下任何模型都不接受 `temperature`，所以始终不发送；只取 `text_delta`，`message_stop` 结束，`error` 事件报错。
+  - Gemini：`/models/{model}:streamGenerateContent?alt=sse`（非流式 `:generateContent`），`x-goog-api-key`；系统提示词放 `systemInstruction`；跳过 `thought: true` 的片段；流没有结束标记，连接关闭即结束；被安全策略拦下时报 `finishReason`。
+- **默认提示词**：译成英文时要求像母语者日常说话那样：短句、高频词和短语动词、口语句式，避开书面和生僻词（用户想顺便学口语里的高频表达）。翻译提示词两个方向共用，这条只在目标语言是英文时生效；内联提示词整体按聊天消息的口吻写。
 
 ### 5.7 语言检测
 
@@ -251,9 +258,15 @@ relic/
 
 - 位置：`%APPDATA%/com.relic.app/config.toml`。首次启动写出带注释的模板（单元测试保证模板和代码里的默认值一致）。
 - Rust 里有一个带类型的 `Config` 结构体，加了 `#[serde(default)]`，缺少的字段自动用默认值。Rust 是配置的唯一来源，前端只能通过命令读写。
+- 可选字段（`temperature`、`extra_body`）要用**字段级** `default`：否则文件里删掉它，读回来会变成默认服务的值，没法真正清空。
+- **在 Tauri 创建窗口之前就加载并 manage 配置**（`config::load()`），监听文件变化放在 setup 里。原因：Tauri 先创建配置里的窗口再跑 setup，前端页面加载很快，可能在 setup 之前就调用命令读配置而 panic（实际遇到过）。
 - 监听配置文件变化（监听所在目录，兼容"写临时文件再改名"的编辑器，防抖 150ms）：手动改文件也会热重载，主题、热键立即生效，并广播 `config-changed`。文件写错时保留当前配置；启动时就写错则用默认值，但不覆盖用户的文件。
-- 程序自己改配置（如托盘切换主题）时用 `toml_edit` 只改对应的键，保留用户的注释和格式。
-- 设置窗口做出来之前（M4），托盘的"打开设置"直接用默认程序打开 config.toml，没有关联程序时用记事本。
+- 程序自己改配置（托盘切换主题、设置窗口）时用 `toml_edit` 合并：只替换值有变化的键（按值比较，不管写法），替换时保留行尾注释；删除新配置里没有的键；子表递归，同样长度的表数组逐个合并；原来写成内联表的保持内联。文件本身写坏了才整份覆盖。
+- **设置窗口**（M4）：托盘"打开设置"打开。按需创建、关闭即销毁；系统标题栏 + Mica 背景（`transparent` 避免白屏一闪），可调大小。左侧导航：通用、快捷键、内联翻译、AI 服务、提示词。改完自动保存：开关和下拉框立即保存，文本框失焦或按 Enter 时保存；校验不通过不保存并在底部提示。`extra_body` 等高级项也可以在"通用"页底部打开 config.toml 直接改（没有关联程序时用记事本）。
+  - 原生下拉框的选项列表不跟随 `color-scheme`，要给 `option` 显式设背景和文字颜色，否则深色主题下是白底浅字。
+- **热键录入**：点击后按下组合键即保存（Esc 取消、Backspace 清除）；录入期间暂停所有全局热键，否则按下要录的组合键会直接触发翻译。热键被占用时在设置窗口底部提示。
+- **开机自启**：`tauri-plugin-autostart`，写在注册表 Run 键里，状态以注册表为准，不进 config.toml。
+- Relic 自己的任何窗口（翻译、设置、浮标）在前台时，热键和双击 Alt 都不当成"其他应用"处理（按进程 ID 判断）。
 - API key 先明文存在配置文件里（只有当前用户能访问的目录）。以后可以改成存到 Windows 凭据管理器（`keyring` crate）。
 
 ```toml
@@ -299,6 +312,7 @@ inline = """..."""
 - 仓库位置：`D:\code\relic`，在 Windows 原生环境下开发（Claude Desktop 的 Windows 会话）。
 - Windows 侧工具链（2026-11-09 已装好）：Rust stable-msvc（`RUSTUP_HOME`、`CARGO_HOME` 在 `D:\software\dev\`）、VS 2022 Build Tools C++ 工作负载（`D:\software\dev\VSBuildTools`）、Node 26 + pnpm（store 在 `D:\.pnpm-store`）、WebView2。Windows SDK 和 VS Installer 只能装在 C 盘。
 - 开发：`pnpm tauri dev`。前端改动热更新；Rust 改动会自动重新编译并重启应用。
+- 打包：`pnpm tauri build`，只出 NSIS 安装包（`installMode: currentUser`，不需要管理员权限，装到 `%LOCALAPPDATA%`）。开发版同时在跑时，设 `CARGO_TARGET_DIR=src-tauri/target-release` 用单独的构建目录，避免抢构建锁。
 - 参考实现 pot-desktop 在 WSL 里：`\\wsl.localhost\Ubuntu-24.04\home\edy\code\pot-desktop`，只作参考，不照搬。
 
 ## 7. 里程碑

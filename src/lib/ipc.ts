@@ -1,9 +1,11 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { Config } from "./bindings/Config";
+import type { Language } from "./bindings/Language";
 import type { TranslateEvent } from "./bindings/TranslateEvent";
 import type { TranslateRequest } from "./bindings/TranslateRequest";
 
-export type { TranslateEvent, TranslateRequest };
+export type { Config, Language, TranslateEvent, TranslateRequest };
 export type ResolvedTheme = "light" | "dark";
 
 export interface ShowPayload {
@@ -29,6 +31,14 @@ export const ipc = {
   copyText: (text: string) => invoke<void>("copy_text", { text }),
   pasteBack: (text: string) => invoke<void>("paste_back", { text }),
   fitIndicator: (width: number, height: number) => invoke<void>("fit_indicator", { width, height }),
+  getConfig: () => invoke<Config>("get_config"),
+  /** 返回需要提示的问题（如热键被占用）；校验不通过会 reject */
+  setConfig: (config: Config) => invoke<string[]>("set_config", { config }),
+  getAutostart: () => invoke<boolean>("get_autostart"),
+  setAutostart: (enabled: boolean) => invoke<void>("set_autostart", { enabled }),
+  suspendHotkeys: (suspended: boolean) => invoke<string[]>("suspend_hotkeys", { suspended }),
+  listLanguages: () => invoke<Language[]>("list_languages"),
+  openConfigFile: () => invoke<void>("open_config_file"),
 };
 
 export const events = {
@@ -38,6 +48,7 @@ export const events = {
     listen<ResolvedTheme>("relic://theme", (e) => cb(e.payload)),
   onIndicator: (cb: (s: IndicatorState) => void): Promise<UnlistenFn> =>
     listen<IndicatorState>("relic://indicator", (e) => cb(e.payload)),
+  onConfigChanged: (cb: () => void): Promise<UnlistenFn> => listen("relic://config-changed", () => cb()),
 };
 
 /** 把解析后的主题同步到 <html data-theme>，并跟随后续变化 */
