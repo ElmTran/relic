@@ -12,9 +12,10 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use ui::ShowMode;
 
-/// 当前注册的输入翻译热键
+/// 当前注册的热键
 #[derive(Default)]
 struct Hotkeys {
+    selection: Mutex<Option<Shortcut>>,
     input: Mutex<Option<Shortcut>>,
 }
 
@@ -30,15 +31,18 @@ pub fn run() {
                     if event.state() != ShortcutState::Pressed {
                         return;
                     }
-                    let is_input = app.state::<Hotkeys>().input.lock().unwrap().as_ref() == Some(shortcut);
-                    if is_input {
-                        ui::show_translate(app, ShowMode::Input, Some(""));
+                    let hotkeys = app.state::<Hotkeys>();
+                    if hotkeys.selection.lock().unwrap().as_ref() == Some(shortcut) {
+                        orchestrator::on_hotkey(app, ShowMode::Selection);
+                    } else if hotkeys.input.lock().unwrap().as_ref() == Some(shortcut) {
+                        orchestrator::on_hotkey(app, ShowMode::Input);
                     }
                 })
                 .build(),
         )
         .manage(Hotkeys::default())
         .manage(orchestrator::Translator::new())
+        .manage(orchestrator::PasteTarget::default())
         .setup(|app| {
             let handle = app.handle();
             config::init(handle)?;
@@ -53,14 +57,22 @@ pub fn run() {
             ui::resize_to_content,
             orchestrator::translate,
             orchestrator::cancel,
+            orchestrator::copy_text,
+            orchestrator::paste_back,
         ])
         .run(tauri::generate_context!())
         .expect("启动 Relic 失败");
 }
 
-/// 按配置注册热键；没变就不动
+/// 按配置注册热键；没变的不动
 fn register_hotkeys(app: &AppHandle) {
-    let wanted = config::get(app).hotkeys.input.clone();
+    let cfg = config::get(app);
+    let hotkeys = app.state::<Hotkeys>();
+    register(app, &hotkeys.selection, &cfg.hotkeys.selection);
+    register(app, &hotkeys.input, &cfg.hotkeys.input);
+}
+
+fn register(app: &AppHandle, slot: &Mutex<Option<Shortcut>>, wanted: &str) {
     let parsed = match wanted.parse::<Shortcut>() {
         Ok(s) => Some(s),
         Err(e) => {
@@ -68,8 +80,7 @@ fn register_hotkeys(app: &AppHandle) {
             None
         }
     };
-    let state = app.state::<Hotkeys>();
-    let mut current = state.input.lock().unwrap();
+    let mut current = slot.lock().unwrap();
     if *current == parsed {
         return;
     }

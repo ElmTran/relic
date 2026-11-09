@@ -16,7 +16,6 @@ const MAX_HEIGHT_RATIO: f64 = 0.6;
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ShowMode {
-    #[allow(dead_code)] // M2 划词时使用
     Selection,
     Input,
 }
@@ -58,7 +57,7 @@ pub fn show_translate(app: &AppHandle, mode: ShowMode, text: Option<&str>) {
     // 先推内容再显示，避免闪一下旧内容
     let _ = win.emit_to(TRANSLATE, "relic://show", ShowPayload { mode, text });
     if !win.is_visible().unwrap_or(false) {
-        if let Some(pos) = center_on_cursor_monitor(app, &win) {
+        if let Some(pos) = placement(app, &win, mode) {
             let _ = win.set_position(pos);
         }
         let _ = win.show();
@@ -76,16 +75,34 @@ pub fn hide_translate(app: &AppHandle) {
     }
 }
 
-/// 鼠标所在显示器工作区的中央
-fn center_on_cursor_monitor(app: &AppHandle, win: &WebviewWindow) -> Option<PhysicalPosition<i32>> {
+/// 翻译窗口的 HWND（用作剪贴板所有者，以及判断前台是不是自己）
+#[cfg(windows)]
+pub fn translate_hwnd(app: &AppHandle) -> Option<isize> {
+    translate_window(app)?.hwnd().ok().map(|h| h.0 as isize)
+}
+
+/// 输入翻译：鼠标所在显示器工作区的中央。
+/// 划词翻译：鼠标右下方，放不下时翻到上方/左侧，限制在工作区内。
+fn placement(app: &AppHandle, win: &WebviewWindow, mode: ShowMode) -> Option<PhysicalPosition<i32>> {
     let cursor = app.cursor_position().ok()?;
     let monitor = app.monitor_from_point(cursor.x, cursor.y).ok().flatten()?;
     let area = monitor.work_area();
     let size = win.outer_size().ok()?;
-    Some(PhysicalPosition::new(
-        area.position.x + (area.size.width as i32 - size.width as i32) / 2,
-        area.position.y + (area.size.height as i32 - size.height as i32) / 2,
-    ))
+    let (w, h) = (size.width as i32, size.height as i32);
+    let (left, top) = (area.position.x, area.position.y);
+    let (right, bottom) = (left + area.size.width as i32, top + area.size.height as i32);
+
+    let (x, y) = match mode {
+        ShowMode::Input => (left + (right - left - w) / 2, top + (bottom - top - h) / 2),
+        ShowMode::Selection => {
+            let gap = (12.0 * monitor.scale_factor()) as i32;
+            let (cx, cy) = (cursor.x as i32, cursor.y as i32);
+            let x = if cx + gap + w <= right { cx + gap } else { cx - gap - w };
+            let y = if cy + gap + h <= bottom { cy + gap } else { cy - gap - h };
+            (x.clamp(left, (right - w).max(left)), y.clamp(top, (bottom - h).max(top)))
+        }
+    };
+    Some(PhysicalPosition::new(x, y))
 }
 
 /// 按配置设置窗口主题（原生 Acrylic 的色调跟着变），并通知前端

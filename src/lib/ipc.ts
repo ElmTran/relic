@@ -22,6 +22,8 @@ export const ipc = {
     return invoke<void>("translate", { req, channel });
   },
   cancel: () => invoke<void>("cancel"),
+  copyText: (text: string) => invoke<void>("copy_text", { text }),
+  pasteBack: (text: string) => invoke<void>("paste_back", { text }),
 };
 
 export const events = {

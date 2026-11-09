@@ -18,6 +18,9 @@ export function TranslateWindow() {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
   const [direction, setDirection] = useState<Direction | null>(null);
+  /** 底栏的短暂提示：已复制、回填失败原因 */
+  const [notice, setNotice] = useState("");
+  const noticeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const sourceRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -124,19 +127,52 @@ export function TranslateWindow() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      // 正在翻译时取消，否则隐藏窗口
-      if (statusRef.current === "translating") cancel();
-      else ipc.hide();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        // 正在翻译时取消，否则隐藏窗口
+        if (statusRef.current === "translating") cancel();
+        else ipc.hide();
+      } else if (e.key === "Enter" && e.ctrlKey && !e.isComposing) {
+        e.preventDefault();
+        actionsRef.current.pasteBack();
+      } else if (e.key.toLowerCase() === "c" && e.ctrlKey && !e.shiftKey && !e.altKey && !hasTextSelection()) {
+        // 窗口里没有选中文字时，Ctrl+C 复制译文
+        e.preventDefault();
+        actionsRef.current.copy();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [cancel]);
 
+  const flash = (text: string) => {
+    clearTimeout(noticeTimer.current);
+    setNotice(text);
+    noticeTimer.current = setTimeout(() => setNotice(""), 2000);
+  };
+
+  const canAct = status === "done" && result.length > 0;
+
+  const copy = () => {
+    if (!canAct) return;
+    ipc.copyText(result).then(
+      () => flash("已复制"),
+      (e) => flash(String(e)),
+    );
+  };
+
+  const pasteBack = () => {
+    if (!canAct) return;
+    ipc.pasteBack(result).catch((e) => flash(String(e)));
+  };
+
+  // 全局快捷键处理里拿到最新的 copy / pasteBack
+  const actionsRef = useRef({ copy, pasteBack });
+  actionsRef.current = { copy, pasteBack };
+
   const onSourceKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // 输入法选词时的 Enter 不算
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+    // 输入法选词时的 Enter 不算；Ctrl+Enter 是回填，交给全局处理
+    if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       translate(source);
     }
@@ -191,9 +227,18 @@ export function TranslateWindow() {
         </div>
       </div>
 
-      <footer className="flex h-9 shrink-0 items-center justify-end gap-0.5 px-1.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-        <TextButton icon={<Copy size={13} />}>复制</TextButton>
-        <TextButton icon={<CornerDownLeft size={13} />}>回填</TextButton>
+      <footer
+        className={`flex h-9 shrink-0 items-center gap-0.5 pl-3.5 pr-1.5 transition-opacity duration-150 group-hover:opacity-100 ${
+          notice ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        <span className="min-w-0 flex-1 truncate text-xs text-fg-muted">{notice}</span>
+        <TextButton icon={<Copy size={13} />} disabled={!canAct} title="复制译文（Ctrl+C）" onClick={copy}>
+          复制
+        </TextButton>
+        <TextButton icon={<CornerDownLeft size={13} />} disabled={!canAct} title="粘贴回原应用（Ctrl+Enter）" onClick={pasteBack}>
+          回填
+        </TextButton>
       </footer>
     </div>
   );
@@ -231,14 +276,30 @@ function IconButton(props: { label: string; onClick: () => void; children: React
   );
 }
 
-function TextButton(props: { icon: React.ReactNode; children: React.ReactNode }) {
+function TextButton(props: {
+  icon: React.ReactNode;
+  title: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       type="button"
-      className="flex h-7 items-center gap-1.5 rounded-md px-2 text-xs text-fg-muted transition-colors duration-150 hover:bg-hover hover:text-fg active:bg-active"
+      title={props.title}
+      disabled={props.disabled}
+      onClick={props.onClick}
+      className="flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs text-fg-muted transition-colors duration-150 enabled:hover:bg-hover enabled:hover:text-fg enabled:active:bg-active disabled:opacity-40"
     >
       {props.icon}
       {props.children}
     </button>
   );
+}
+
+/** 窗口里是否选中了文字（包括原文输入框里的选区） */
+function hasTextSelection(): boolean {
+  const active = document.activeElement;
+  if (active instanceof HTMLTextAreaElement && active.selectionStart !== active.selectionEnd) return true;
+  return (window.getSelection()?.toString() ?? "").length > 0;
 }
