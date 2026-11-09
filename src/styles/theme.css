@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+/* 主题变量：叠加在原生 Acrylic 上的半透明色。圆角和外框由 DWM 原生绘制，CSS 不画。 */
+:root,
+:root[data-theme="light"] {
+  --surface: rgb(252 252 252 / 0.5);
+  --fg: rgb(26 26 26);
+  --fg-muted: rgb(0 0 0 / 0.45);
+  --divider: rgb(0 0 0 / 0.08);
+  --hover: rgb(0 0 0 / 0.06);
+  --active: rgb(0 0 0 / 0.1);
+  --accent: rgb(0 95 184);
+  --selection: rgb(0 95 184 / 0.22);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --surface: rgb(32 32 32 / 0.45);
+  --fg: rgb(240 240 240);
+  --fg-muted: rgb(255 255 255 / 0.5);
+  --divider: rgb(255 255 255 / 0.08);
+  --hover: rgb(255 255 255 / 0.07);
+  --active: rgb(255 255 255 / 0.11);
+  --accent: rgb(96 205 255);
+  --selection: rgb(96 205 255 / 0.28);
+  color-scheme: dark;
+}
+
+@theme {
+  --color-surface: var(--surface);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-divider: var(--divider);
+  --color-hover: var(--hover);
+  --color-active: var(--active);
+  --color-accent: var(--accent);
+  --font-sans: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+::selection {
+  background: var(--selection);
+}
+
+/* 细滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--divider);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-muted);
+}
