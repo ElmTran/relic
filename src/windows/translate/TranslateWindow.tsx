@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Copy, CornerDownLeft, X } from "lucide-react";
+import { Copy, CornerDownLeft, Pin, X } from "lucide-react";
 import { events, ipc, type TranslateEvent } from "../../lib/ipc";
 
 const SOURCE_MAX_LINES = 3;
@@ -23,6 +23,27 @@ export function TranslateWindow() {
   const noticeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   /** 终端模式（双击 Alt 时前台是终端）的目标语言；null 表示普通模式 */
   const [composeTo, setComposeTo] = useState<string | null>(null);
+  /** 📌 固定 = 失焦不隐藏，和设置里的"失焦时隐藏"是同一个开关 */
+  const [pinned, setPinned] = useState(true);
+
+  useEffect(() => {
+    const sync = () => ipc.getConfig().then((c) => setPinned(!c.general.hide_on_blur));
+    sync();
+    const unlisten = events.onConfigChanged(sync);
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, []);
+
+  const togglePin = async () => {
+    const config = await ipc.getConfig();
+    config.general.hide_on_blur = pinned;
+    setPinned(!pinned);
+    ipc.setConfig(config).catch((e) => {
+      setPinned(pinned);
+      flash(String(e));
+    });
+  };
 
   const sourceRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -212,6 +233,9 @@ export function TranslateWindow() {
           <span className="pointer-events-none px-1.5 text-xs text-fg-muted">自动检测</span>
         )}
         <div data-tauri-drag-region className="h-full flex-1" />
+        <IconButton label={pinned ? "取消固定（失焦时隐藏）" : "固定（失焦不隐藏）"} active={pinned} onClick={togglePin}>
+          <Pin size={14} className={`transition-transform duration-150 ${pinned ? "" : "rotate-45"}`} />
+        </IconButton>
         <IconButton label="关闭" onClick={() => ipc.hide()}>
           <X size={15} />
         </IconButton>
@@ -271,14 +295,17 @@ function Result(props: { status: Status; result: string; error: string; onRetry:
   return <p className="text-fg-muted">按 Enter 翻译，Shift+Enter 换行</p>;
 }
 
-function IconButton(props: { label: string; onClick: () => void; children: React.ReactNode }) {
+function IconButton(props: { label: string; active?: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       type="button"
       title={props.label}
       aria-label={props.label}
+      aria-pressed={props.active}
       onClick={props.onClick}
-      className="grid size-7 place-items-center rounded-md opacity-45 transition-[opacity,background-color] duration-150 hover:bg-hover hover:opacity-100 active:bg-active"
+      className={`grid size-7 place-items-center rounded-md transition-[opacity,background-color] duration-150 hover:bg-hover hover:opacity-100 active:bg-active ${
+        props.active ? "opacity-90" : "opacity-45"
+      }`}
     >
       {props.children}
     </button>

@@ -1,6 +1,6 @@
 # Relic 设计文档
 
-> 状态：草案 v0.2（2026-11-09）
+> 状态：v0.3（2026-11-10）。MVP（M0–M4）已完成，已发布 0.1.x。
 > Relic 是一个自用的桌面翻译工具，交互参考 pot-desktop，但从零重写。原则：**简洁、快、顺手**。
 
 ## 1. 定位与原则
@@ -27,7 +27,7 @@
 
 ### 后续（P1）
 
-历史记录（SQLite 全文搜索）、截图 OCR 和截图翻译（Windows.Media.Ocr 或 LLM 视觉）、TTS、提示词预设（润色、解释）、命令行调用。（开机自启已在 M4 做了）
+历史记录（SQLite 全文搜索）、截图 OCR 和截图翻译（Windows.Media.Ocr 或 LLM 视觉）、TTS、提示词预设（润色、解释）、命令行调用、窗口宽度持久化。
 
 ### 不做
 
@@ -39,7 +39,7 @@
 
 ```
 ╭────────────────────────────────────╮
-│ 中文 → English                 ✕ │  ← 整行可拖拽，图标平时淡显；方向标签可点击切换
+│ 中文 → English              📌 ✕ │  ← 整行可拖拽，图标平时淡显；方向标签可点击切换
 │ 原文（可编辑，默认最多显示 3 行）       │
 │ ────────────────────────────────── │  ← 1px 细分隔线
 │ 译文（流式输出）                       │
@@ -48,7 +48,7 @@
 ╰────────────────────────────────────╯
 ```
 
-- 高度随内容自动变化，上限为显示器工作区高度的 60%，超过后译文区滚动；窗口底部不会超出工作区。宽度可以拖动调整，并记住（目前只在本次运行内记住，持久化待定）。
+- 高度随内容自动变化，上限为显示器工作区高度的 60%，超过后译文区滚动；窗口底部不会超出工作区。宽度可以拖动调整，只在本次运行内记住。
 - 方向标签：翻译前显示"自动检测"；翻译后显示"原文语言 → 目标语言"，点击切换为另一个方向，并重新翻译。改了原文再按 Enter，又回到自动方向。
 - 翻译失败时，在译文区显示错误原因和"重试"按钮。
 - 复制、回填按钮在有完整译文时才可用；复制成功、回填失败的原因在底栏左侧提示 2 秒。
@@ -56,8 +56,9 @@
   - 划词翻译：出现在鼠标附近，限制在当前显示器工作区内。
   - 输入翻译：出现在当前显示器中央。
   - 窗口已经显示时再次触发，只替换内容，不移动位置。
-  - 隐藏窗口的方式：Esc、✕ 按钮、托盘菜单。**失焦不隐藏**。设置里提供"失焦时隐藏"选项，默认关闭。
-  - **始终置顶**，切到别的窗口也不会被盖住。因此不设 📌 固定按钮。
+  - **始终置顶**，切到别的窗口也不会被盖住。
+  - 隐藏窗口的方式：Esc、✕ 按钮、托盘菜单；取消固定时失焦也会隐藏。
+  - 📌 固定按钮和设置里的"失焦时隐藏"是同一个开关（固定 = `hide_on_blur = false`，默认固定），点一下直接保存到配置。取消固定时图钉斜放、变淡。
 
 ### 3.2 快捷键
 
@@ -148,13 +149,9 @@ relic/
 
 - **命令**
   - `translate(req, channel)`：结果通过 Channel 推送，事件依次为 `Started → Delta* → Done | Error`。`Started` 带方向信息，`Done` 带后处理后的完整译文，前端用它替换流式拼出的内容
-  - `cancel`
-  - `hide`
-  - `get_theme`
-  - `resize_to_content`
-  - M2：`copy_text`、`paste_back`
-  - M3：`fit_indicator`（浮标按内容调整大小）
-  - M4（设置窗口）：`get_config`、`set_config`（校验后保存，返回热键被占用等提示）、`get_autostart`、`set_autostart`、`suspend_hotkeys`、`list_languages`、`open_config_file`
+  - 翻译窗口：`cancel`、`hide`、`get_theme`、`resize_to_content`、`copy_text`、`paste_back`
+  - 浮标：`fit_indicator`（按内容调整大小）
+  - 配置与设置窗口：`get_config`、`set_config`（校验后保存，返回热键被占用等提示；翻译窗口的 📌 也用它）、`get_autostart`、`set_autostart`、`suspend_hotkeys`、`list_languages`、`open_config_file`
 - **事件**
   - `relic://show`：载荷为 `{ mode: "selection" | "input" | "compose", text, to }`，`text` 为 null 时保留窗口现有内容；`to` 是 compose（终端）模式固定的目标语言
   - `relic://theme`：解析后的主题 `light | dark`，发给所有窗口
@@ -205,7 +202,7 @@ relic/
 - **不写入剪贴板历史**；
 - 用**序列号**判断剪贴板是否变化；
 - 剪贴板可能正被别的程序占用，打开时重试最多 300ms；以翻译窗口的 HWND 作为所有者。
-- 注入的按键都在 `dwExtraInfo` 里带标记 `RELI`，M3 的键盘钩子据此忽略自己发出的键。
+- 注入的按键都在 `dwExtraInfo` 里带标记 `RELI`。
 
 ### 5.5 双击 Alt 内联翻译
 
@@ -213,10 +210,11 @@ relic/
 
 - **为什么不用双击空格（已否决）**：连按两个空格是正常输入（代码缩进、对齐），三击、黑名单都只能减少误触；中文输入法用空格选词也会误判。专用组合热键又不够顺手。Alt 单独按不产生字符，日常几乎不会连按两次。
 - **触发**
-  - 在独立线程里安装 `WH_KEYBOARD_LL` 钩子并运行消息循环。钩子**不拦截**任何按键，只做观察，回调里只记录状态、把事件发给工作线程。
+  - 在独立线程里安装 `WH_KEYBOARD_LL` 钩子并运行消息循环。钩子只做观察（唯一例外见下面的 Chromium），回调里只记录状态、把事件发给工作线程。
   - 忽略注入的按键（带 `LLKHF_INJECTED` 标志），包括 Relic 自己发的。
   - "单击 Alt"：左右 Alt 都算，按下后 300ms 内松开，中间没有按其他键（所以 Alt+Tab、Alt+E 都不算）。两次单击间隔小于 `interval_ms`（默认 300ms）就触发；中间按了其他键则重新计数。
   - 副作用：记事本、Office、Firefox 等应用里单击 Alt 会激活菜单或显示快捷键提示，双击是开一次、关一次，正好抵消。
+  - **Chromium 例外**（窗口类名 `Chrome_WidgetWin_1`：Chrome、Edge、Electron 应用）：单击 Alt 会把焦点移到工具栏的菜单按钮，再按一次不会还给网页，后面的 Ctrl+A/C/V 就发到了工具栏。所以前台是 Chromium 时，钩子拦下单击 Alt 的松开，改为注入屏蔽键 `0xE8` 再松开 Alt（同 5.2 的做法），应用不再把它当成单击 Alt。代价：这些应用里单击 Alt 不再聚焦菜单按钮（F10、Alt+F 不受影响）。
 - **流程**（在工作线程里，同一时间只跑一个）
   1. 记录当前前台 HWND；是 Relic 自己的窗口、或进程在黑名单里（默认为空）就不处理。
   2. 在光标附近显示"翻译中…"浮标（不抢焦点）。光标位置用 `GetGUIThreadInfo` 取，拿不到就用鼠标位置。
@@ -314,6 +312,7 @@ inline = """..."""
 - Windows 侧工具链（2026-11-09 已装好）：Rust stable-msvc（`RUSTUP_HOME`、`CARGO_HOME` 在 `D:\software\dev\`）、VS 2022 Build Tools C++ 工作负载（`D:\software\dev\VSBuildTools`）、Node 26 + pnpm（store 在 `D:\.pnpm-store`）、WebView2。Windows SDK 和 VS Installer 只能装在 C 盘。
 - 开发：`pnpm tauri dev`。前端改动热更新；Rust 改动会自动重新编译并重启应用。
 - 打包：`pnpm tauri build`，只出 NSIS 安装包（`installMode: currentUser`，不需要管理员权限，装到 `%LOCALAPPDATA%`）。开发版同时在跑时，设 `CARGO_TARGET_DIR=src-tauri/target-release` 用单独的构建目录，避免抢构建锁。
+- 发版：版本号同时改 `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`；打包后打 `vX.Y.Z` 标签，用 `gh release create` 上传 `Relic_X.Y.Z_x64-setup.exe`，说明里附 SHA-256。安装包未签名。
 - 参考实现 pot-desktop 在 WSL 里：`\\wsl.localhost\Ubuntu-24.04\home\edy\code\pot-desktop`，只作参考，不照搬。
 
 ## 7. 里程碑
@@ -328,11 +327,11 @@ inline = """..."""
 
 ## 8. 已定决策
 
-- 内联翻译：双击 Alt 触发，不设白名单（所有应用都启用，可用黑名单排除）；有选中文字就只翻译选中部分，没有选中就翻译整个输入框。
+- 热键默认值：`Alt+E` 划词、`Alt+F` 输入（沿用 pot 的习惯；`Alt+Q` 被 Fluent Search 占用）。
+- 内联翻译：双击 Alt 触发（双击空格会和代码缩进冲突），不设白名单（所有应用都启用，可用黑名单排除）；有选中文字就只翻译选中部分，没有选中就翻译整个输入框。
 - 圆角：原生圆角（系统固定约 8px）配真实 Acrylic 磨砂。
-- 开发环境：仓库放在 `D:\code\relic`，在 Windows 原生环境下开发。
 
-## 9. 待定问题
+## 9. 版本记录
 
-1. ~~热键默认值~~ 已定：`Alt+E` 划词、`Alt+F` 输入（沿用 pot 的习惯；`Alt+Q` 被 Fluent Search 占用）。
-2. ~~内联翻译的触发方式~~ 已定：双击 Alt（双击空格会和代码缩进冲突）。
+- 0.1.0（2026-11-09）：MVP。
+- 0.1.1（2026-11-10）：修复 Chrome 等 Chromium 应用里双击 Alt 时焦点跑到工具栏；翻译窗口加回 📌 固定按钮。

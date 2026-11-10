@@ -1,6 +1,6 @@
 [package]
 name = "relic"
-version = "0.1.0"
+version = "0.1.1"
 description = "Relic 桌面翻译"
 edition = "2024"
 

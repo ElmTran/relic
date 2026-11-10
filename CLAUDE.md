@@ -2,19 +2,20 @@
 
 自用桌面翻译工具（Windows 为主），Tauri v2 + React 19 + TypeScript + Tailwind CSS 4，AI 请求和系统交互在 Rust 侧。
 
-- 设计文档：`docs/design.md`（功能范围、交互、架构、关键实现方案、里程碑都在里面，改动方案时同步更新它）
+- 设计文档：`docs/design.md`（功能范围、交互、架构、关键实现方案、版本记录都在里面，改动方案时同步更新它）
 - 回复用中文。
 - 用户偏好：极简 UI、性能、易用；对细节要求高。只做用户确认过的功能，不擅自加功能或依赖。
 - 参考实现 pot-desktop：`\\wsl.localhost\Ubuntu-24.04\home\edy\code\pot-desktop`，只作参考，不照搬结构。
 
-## 当前进度
+## 当前状态
 
-- 设计已定稿到 v0.2。
-- Windows 工具链已就绪（2026-11-09）：Rust stable-msvc（`RUSTUP_HOME`/`CARGO_HOME` 在 `D:\software\dev\`）、VS 2022 Build Tools C++ 工作负载（`D:\software\dev\VSBuildTools`）、Node + pnpm（store 在 `D:\.pnpm-store`）、WebView2。
-- M0 已完成并提交（2026-11-09）。
-- M1 已完成并提交（2026-11-09）：config.toml 热重载、OpenAI 格式流式翻译与取消、语言检测、输入翻译、窗口高度自适应、托盘"打开设置"。用户用的是国内自定义 OpenAI 兼容服务（base_url 需带 /v1）。
-- M2 已完成（2026-11-09）：Alt+E 划词（UIA 优先、回退 Ctrl+C）、复制、回填、剪贴板快照与恢复。用户在记事本、浏览器、微信实测通过。
-- M3 已完成（2026-11-09）：双击 Alt 内联翻译（否决了双击空格），浮标不抢焦点；终端里改为弹出输入框，翻译后再按 Enter 用 Shift+Insert 粘贴回终端。用户在聊天框、PowerShell、WSL 实测通过。
-- M4 已完成（2026-11-09）：设置窗口（左侧导航、自动保存、热键录入）、Anthropic/Gemini 适配器、开机自启、NSIS 打包；默认提示词改为母语者口语化的简单英文。
-- MVP 全部完成。后续（P1）候选见设计文档第 2 节。
-- 开发命令：`pnpm tauri dev`；Rust 测试 `cd src-tauri && cargo test`（同时更新 `src/lib/bindings/` 的 TS 类型）。当前 PowerShell 会话里需要先设好 `RUSTUP_HOME`/`CARGO_HOME`/PATH 才能用 cargo。
+- MVP（M0–M4）已完成，已发布 v0.1.0、v0.1.1（GitHub Releases，私有仓库 ElmTran/relic）。后续（P1）候选见设计文档第 2 节。
+- 用户用的是国内自定义 OpenAI 兼容服务（base_url 需带 `/v1`）。
+- 用户实测过的场景：记事本、Chrome、微信、PowerShell、WSL。改动划词、回填、内联翻译时要考虑这些应用。
+
+## 开发
+
+- 工具链在 `D:\software\dev\`（Rust stable-msvc、VS 2022 Build Tools）。PowerShell 会话里要先设环境变量才能用 cargo：
+  `$env:RUSTUP_HOME='D:\software\dev\rustup'; $env:CARGO_HOME='D:\software\dev\cargo'; $env:PATH="D:\software\dev\cargo\bin;$env:PATH"`
+- 运行：`pnpm tauri dev`。Rust 测试：`cd src-tauri && cargo test`（同时更新 `src/lib/bindings/` 的 TS 类型）。前端类型检查：`pnpm exec tsc --noEmit`。
+- 打包和发版步骤见设计文档第 6 节。

@@ -1,4 +1,5 @@
-//! 低级键盘钩子（WH_KEYBOARD_LL）：识别"快速按两下 Alt"和 Esc。只观察，不拦截任何按键。
+//! 低级键盘钩子（WH_KEYBOARD_LL）：识别"快速按两下 Alt"和 Esc。
+//! 只观察，唯一的例外是 Chromium 窗口里单击 Alt 的松开（见 hook_proc）。
 //! 回调里只更新状态、把事件发给工作线程，必须很快返回，否则系统会摘掉钩子。
 
 use std::cell::RefCell;
@@ -73,20 +74,41 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
         if kb.flags.0 & LLKHF_INJECTED.0 == 0 {
             let msg = wparam.0 as u32;
             let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
-            if let Some(event) = STATE.with_borrow_mut(|s| s.on_key(kb.vkCode, down, Instant::now())) {
+            let now = Instant::now();
+            let (tap, event) = STATE.with_borrow_mut(|s| (s.is_tap_release(kb.vkCode, down, now), s.on_key(kb.vkCode, down, now)));
+            if let Some(event) = event {
                 if let Some(tx) = SENDER.get() {
                     let _ = tx.send(event);
                 }
+            }
+            // Chromium（Chrome、Edge、Electron）里单击 Alt 会把焦点移到工具栏菜单按钮，再按一次也不会还回网页，
+            // 后面的 Ctrl+A/C/V 就发到了工具栏。拦下这次松开，补发屏蔽键再松开，Chromium 就不认为是单击 Alt
+            if tap && is_chromium_foreground() {
+                super::input::masked_alt_up(kb.vkCode);
+                return LRESULT(1);
             }
         }
     }
     unsafe { CallNextHookEx(None, code, wparam, lparam) }
 }
 
+fn is_chromium_foreground() -> bool {
+    super::focus::foreground().is_some_and(|h| super::focus::class_name(h) == "Chrome_WidgetWin_1")
+}
+
+fn is_alt(vk: u32) -> bool {
+    matches!(vk, VK_MENU | VK_LMENU | VK_RMENU)
+}
+
 impl State {
+    /// 这个事件是不是一次"单击 Alt"的松开（在 on_key 之前调用）
+    fn is_tap_release(&self, vk: u32, down: bool, now: Instant) -> bool {
+        !down && is_alt(vk) && !self.interrupted && self.alt_down_at.is_some_and(|t| now - t <= TAP_MAX)
+    }
+
     fn on_key(&mut self, vk: u32, down: bool, now: Instant) -> Option<HookEvent> {
         let interval = Duration::from_millis(INTERVAL_MS.load(Ordering::Relaxed));
-        if matches!(vk, VK_MENU | VK_LMENU | VK_RMENU) {
+        if is_alt(vk) {
             if down {
                 // 按住不放会不断重复 keydown，只认第一次
                 if self.alt_down_at.is_none() {
@@ -162,6 +184,22 @@ mod tests {
     fn triple_tap_triggers_once() {
         let keys = [(A, true, 0), (A, false, 50), (A, true, 150), (A, false, 200), (A, true, 300), (A, false, 350)];
         assert_eq!(run(&keys), ["DoubleAlt"]);
+    }
+
+    #[test]
+    fn tap_release() {
+        let t0 = Instant::now();
+        let ms = |n| t0 + Duration::from_millis(n);
+        let mut s = State::default();
+        s.on_key(A, true, ms(0));
+        assert!(s.is_tap_release(A, false, ms(80)));
+        // 按住太久
+        assert!(!s.is_tap_release(A, false, ms(400)));
+        // Alt+Tab
+        s.on_key(TAB, true, ms(50));
+        assert!(!s.is_tap_release(A, false, ms(80)));
+        // 不是 Alt 松开
+        assert!(!State::default().is_tap_release(TAB, false, ms(80)));
     }
 
     #[test]

@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP,
     MAPVK_VK_TO_VSC,
-    MapVirtualKeyW, SendInput, VIRTUAL_KEY, VK_A, VK_C, VK_CONTROL, VK_INSERT, VK_LWIN, VK_MENU, VK_RIGHT, VK_RWIN, VK_SHIFT, VK_V,
+    MapVirtualKeyW, SendInput, VIRTUAL_KEY, VK_A, VK_C, VK_CONTROL, VK_INSERT, VK_LWIN, VK_MENU, VK_RIGHT, VK_RMENU, VK_RWIN, VK_SHIFT, VK_V,
 };
 
 pub const RELIC_MARK: usize = 0x5245_4C49; // "RELI"
@@ -17,7 +17,7 @@ fn key(vk: VIRTUAL_KEY, up: bool) -> INPUT {
     let scan = unsafe { MapVirtualKeyW(vk.0 as u32, MAPVK_VK_TO_VSC) } as u16;
     let mut flags = if up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS(0) };
     // 方向键、Insert 是扩展键，不带这个标志有的应用会按扫描码当成小键盘
-    if vk == VK_RIGHT || vk == VK_INSERT {
+    if vk == VK_RIGHT || vk == VK_INSERT || vk == VK_RMENU {
         flags |= KEYEVENTF_EXTENDEDKEY;
     }
     INPUT {
@@ -78,6 +78,12 @@ pub fn mask_alt_if_down() {
     if is_down(VK_MENU) {
         send(&[key(VK_MASK, false), key(VK_MASK, true)]);
     }
+}
+
+/// 键盘钩子拦下了单击 Alt 的松开：补发屏蔽键再松开 Alt，应用就不会把它当成单击 Alt
+pub fn masked_alt_up(vk: u32) {
+    let alt = VIRTUAL_KEY(vk as u16);
+    send(&[key(VK_MASK, false), key(VK_MASK, true), key(alt, true)]);
 }
 
 /// 等热键的修饰键都松开，否则发出去的 Ctrl+C 会变成 Ctrl+Alt+C。返回是否等到了
