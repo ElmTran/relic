@@ -9,7 +9,7 @@
 
 ## 当前状态
 
-- MVP（M0–M4）已完成，已发布 v0.1.0、v0.1.1（GitHub Releases，私有仓库 ElmTran/relic）。后续（P1）候选见设计文档第 2 节。
+- MVP（M0–M4）已完成，已发布 v0.1.0、v0.1.1、v0.1.2（GitHub Releases，私有仓库 ElmTran/relic）。后续（P1）候选见设计文档第 2 节。
 - 用户用的是国内自定义 OpenAI 兼容服务（base_url 需带 `/v1`）。
 - 用户实测过的场景：记事本、Chrome、微信、PowerShell、WSL。改动划词、回填、内联翻译时要考虑这些应用。
 

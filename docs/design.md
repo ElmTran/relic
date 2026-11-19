@@ -142,7 +142,8 @@ relic/
       ├─ input.rs                # SendInput，等待修饰键松开
       ├─ focus.rs                # 记录和恢复前台窗口
       ├─ keyhook.rs              # 低级键盘钩子 WH_KEYBOARD_LL
-      └─ effects.rs              # 圆角、Acrylic
+      ├─ effects.rs              # 圆角、Acrylic
+      └─ webview.rs              # 窗口隐藏时 WebView2 休眠，显示前唤醒
 ```
 
 ### 4.4 IPC
@@ -166,6 +167,7 @@ relic/
 - 窗口参数：`decorations: false`、`transparent: true`、`skipTaskbar: true`、`alwaysOnTop: true`、`shadow: false`、`windowEffects: [acrylic]`。
 - 关掉 `shadow`：DWM 的窗口阴影大小由系统固定，激活时很宽，不能调，只能关。关掉后原生圆角和 1px 细边框仍然保留，还会剩一圈很淡的阴影。
 - 启动时创建，设为隐藏；之后只调用 `show`、`hide`、`set_position`。目标：从按热键到窗口显示在 100ms 以内。
+- **隐藏时休眠**：翻译窗口和浮标隐藏后（启动时页面加载完也算），依次调用 WebView2 的 `SetIsVisible(false)`（可见的 WebView 不能挂起）、`SetMemoryUsageTargetLevel(LOW)`、`TrySuspend`，系统把渲染进程的内存页换出 RAM；显示前先 `SetIsVisible(true)` + `Resume`，再推 `relic://show` 事件、再显示窗口（挂起的页面收不到事件）。所有隐藏路径都走 `ui::hide_translate` / `hide_indicator`。前提是前端隐藏时没有要跑的任务：请求、热键、键盘钩子都在 Rust 侧；JS 计时器会暂停，所以显示时要清掉上次的提示。`webview2-com`、`windows-core` 的版本必须和 wry 用的一致。
 - 在 Win11 22H2 及以上版本，Acrylic 由 DWM 的系统背景（`DWMSBT_TRANSIENTWINDOW`）实现，拖动时不卡。本机是 26100，满足条件。
 - **圆角（已定）**：用原生圆角，调用 `DwmSetWindowAttribute(DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND)`，半径由系统固定（约 8px），和真实磨砂配合。不用 CSS `border-radius` 自己画圆角，因为 Acrylic 会铺满整个矩形窗口，圆角外面也会有磨砂。1px 细边框也由 DWM 原生绘制，CSS 不再画边框。
 - 注意：CSS 的 `backdrop-filter` 只能模糊 WebView 内部的内容，模糊不到窗口后面的桌面，所以磨砂必须靠原生 Acrylic。
@@ -335,3 +337,4 @@ inline = """..."""
 
 - 0.1.0（2026-11-09）：MVP。
 - 0.1.1（2026-11-10）：修复 Chrome 等 Chromium 应用里双击 Alt 时焦点跑到工具栏；翻译窗口加回 📌 固定按钮。
+- 0.1.2（2026-11-19）：翻译窗口和浮标隐藏时 WebView2 休眠，隐藏后常驻内存（私有工作集）从约 135 MB 降到约 15 MB。

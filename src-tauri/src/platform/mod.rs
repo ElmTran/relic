@@ -13,3 +13,4 @@ pub mod keyhook;
 #[cfg(windows)]
 pub mod selection;
 pub mod shell;
+pub mod webview;

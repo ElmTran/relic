@@ -136,6 +136,9 @@ export function TranslateWindow() {
 
   useEffect(() => {
     const unlisten = events.onShow(({ mode, text, to }) => {
+      // 隐藏时页面被挂起，计时器也停了，上次的提示不能带到这次
+      clearTimeout(noticeTimer.current);
+      setNotice("");
       if (text !== null) {
         // 终端模式：目标语言固定，翻译后再按 Enter 粘贴回终端
         setComposeTo(mode === "compose" ? to : null);

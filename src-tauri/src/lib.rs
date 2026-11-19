@@ -8,7 +8,7 @@ mod settings;
 mod tray;
 mod ui;
 
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 use ui::ShowMode;
 
@@ -27,6 +27,11 @@ pub fn run() {
         .manage(orchestrator::Translator::new())
         .manage(orchestrator::PasteTarget::default())
         .manage(orchestrator::InlineState::default())
+        .on_page_load(|webview, payload| {
+            if payload.event() == tauri::webview::PageLoadEvent::Finished {
+                ui::on_page_loaded(webview.app_handle(), webview.label());
+            }
+        })
         .setup(|app| {
             let handle = app.handle();
             config::start_watching(handle)?;

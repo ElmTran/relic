@@ -85,7 +85,8 @@ fn show(app: &AppHandle, mode: ShowMode, text: Option<&str>, to: Option<&str>) {
     let Some(win) = translate_window(app) else { return };
     let started = std::time::Instant::now();
 
-    // 先推内容再显示，避免闪一下旧内容
+    // 先唤醒（挂起的页面收不到事件），再推内容，最后显示，避免闪一下旧内容
+    crate::platform::webview::set_awake(&win, true);
     let _ = win.emit_to(TRANSLATE, "relic://show", ShowPayload { mode, text, to });
     if !win.is_visible().unwrap_or(false) {
         if let Some(pos) = placement(app, &win, mode) {
@@ -100,9 +101,23 @@ fn show(app: &AppHandle, mode: ShowMode, text: Option<&str>, to: Option<&str>) {
     let _ = started;
 }
 
+/// 翻译窗口的所有隐藏方式（Esc、关闭按钮、Alt+F4、失焦、回填）都走这里
 pub fn hide_translate(app: &AppHandle) {
     if let Some(win) = translate_window(app) {
         let _ = win.hide();
+        crate::platform::webview::set_awake(&win, false);
+    }
+}
+
+/// 启动时窗口是隐藏的：页面加载完就让它休眠
+pub fn on_page_loaded(app: &AppHandle, label: &str) {
+    if ![TRANSLATE, INDICATOR].contains(&label) {
+        return;
+    }
+    if let Some(win) = app.get_webview_window(label) {
+        if !win.is_visible().unwrap_or(true) {
+            crate::platform::webview::set_awake(&win, false);
+        }
     }
 }
 
@@ -221,6 +236,7 @@ pub struct Anchor {
 /// 在文本光标下方显示浮标（放不下就放到上方）；拿不到光标就放在鼠标右下方。不抢焦点
 pub fn show_indicator(app: &AppHandle, anchor: Option<Anchor>) {
     let Some(win) = indicator_window(app) else { return };
+    crate::platform::webview::set_awake(&win, true);
     let _ = win.emit_to(INDICATOR, "relic://indicator", IndicatorState::Working);
     let anchor = anchor.or_else(|| {
         let c = app.cursor_position().ok()?;
@@ -248,6 +264,7 @@ pub fn indicator_error(app: &AppHandle, message: &str) {
 pub fn hide_indicator(app: &AppHandle) {
     if let Some(win) = indicator_window(app) {
         crate::platform::effects::hide_window(&win);
+        crate::platform::webview::set_awake(&win, false);
     }
 }
 

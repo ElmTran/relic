@@ -3109,7 +3109,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "relic"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "futures-util",
  "notify",
@@ -3125,8 +3125,10 @@ dependencies = [
  "toml 1.2.1+spec-1.1.0",
  "toml_edit 0.25.19+spec-1.1.0",
  "ts-rs",
+ "webview2-com",
  "whatlang",
  "windows 0.61.3",
+ "windows-core 0.62.2",
 ]
 
 [[package]]

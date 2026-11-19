@@ -1,6 +1,6 @@
 [package]
 name = "relic"
-version = "0.1.1"
+version = "0.1.2"
 description = "Relic 桌面翻译"
 edition = "2024"
 
@@ -28,6 +28,9 @@ toml_edit = "0.25.19"
 tauri-plugin-autostart = "2.7.0"
 
 [target.'cfg(windows)'.dependencies]
+# 版本必须和 wry 用的一致，否则类型对不上 Tauri 给的 WebView2 controller
+webview2-com = "0.39"
+windows-core = "0.62"
 windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Ole", "Win32_System_Threading", "Win32_System_Variant", "Win32_UI_Accessibility", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 [profile.release]
